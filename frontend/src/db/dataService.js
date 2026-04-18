@@ -138,6 +138,20 @@ export function subscribeToBrine(callback) {
     .subscribe();
 }
 
+export function subscribeToEvaporationLogs(callback) {
+  return supabase
+    .channel('evaporation-logs')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'evaporation_logs' },
+      (payload) => callback(payload.new)
+    )
+    .subscribe();
+}
+
+export async function fetchLatestEvaporationScore() {
+  const row = await safeFetch('evaporation_logs');
+  return row?.score ?? 14.2;
+}
+
 // ── Connection test ───────────────────────────────────────────────────────
 
 export async function testConnection() {

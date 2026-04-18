@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { fetchAllData, subscribeToWeather, subscribeToVisionAlerts, subscribeToBrine, testConnection } from './db/dataService';
+import { fetchAllData, subscribeToWeather, subscribeToVisionAlerts, subscribeToBrine, subscribeToEvaporationLogs, fetchLatestEvaporationScore, testConnection } from './db/dataService';
 
 // Import all Stitch HTML screens as raw strings
 import dashboardHtml from '../../stitch_amrit_ecosystem_dashboard/ecosystem_guardian_dashboard_dawn_edition/code.html?raw';
@@ -150,46 +150,60 @@ function buildDataInjectionScript(liveData, page) {
     updater = `
       // Update weather badge (e.g., "24°C • High Tide")
       var weatherBadge = document.querySelector('span[class*="font-label"]');
-      document.querySelectorAll('span').forEach(function(el) {
-        var t = el.textContent || '';
-        if (t.match(/\\d+°C/)) {
-          el.textContent = '${weather?.temperature ?? 24}°C • ${weather?.tide_status ?? 'High Tide'}';
-        }
-      });
+      if (weatherBadge) {
+          weatherBadge.textContent = '${weather?.temperature ?? 24}°C • ${weather?.tide_status ?? 'High Tide'}';
+      }
 
-      // Update evaporation score
-      document.querySelectorAll('p, span').forEach(function(el) {
-        var t = (el.textContent || '').trim();
-        if (t === '14.2') el.textContent = '${weather?.evaporation_score ?? 14.2}';
-        if (t === '88') el.textContent = '${weather?.humidity ?? 88}';
-      });
-
-      // Update confidence score
       document.querySelectorAll('span, p').forEach(function(el) {
-        var t = (el.textContent || '').trim();
+        var t = el.textContent.trim();
         if (t === 'CONFIDENCE: 98.4%') el.textContent = 'CONFIDENCE: ${vision?.confidence ?? 98.4}%';
-      });
-
-      // Update stream ID
-      document.querySelectorAll('span, p').forEach(function(el) {
-        var t = (el.textContent || '').trim();
         if (t === 'STREAM_ID: ESTUARY_04') el.textContent = 'STREAM_ID: ${vision?.stream_id ?? 'ESTUARY_04'}';
+        if (t === 'Phase: Preparatory') el.textContent = 'Phase: ${brine?.phase ?? 'Preparatory'}';
       });
 
-      // Update phase badge
-      document.querySelectorAll('span').forEach(function(el) {
-        var t = (el.textContent || '').trim();
-        if (t === 'Phase: Preparatory') el.textContent = 'Phase: ${brine?.phase ?? 'Preparatory'}';
+      // Update evaporation score & humidity (which have inner span elements)
+      document.querySelectorAll('span.font-headline').forEach(function(el) {
+        if (el.childNodes.length > 0 && el.childNodes[0].nodeType === 3) {
+            var text = el.childNodes[0].nodeValue.trim();
+            if (text === '14.2') el.childNodes[0].nodeValue = '${weather?.evaporation_score ?? 14.2}';
+            if (text === '88') el.childNodes[0].nodeValue = '${weather?.humidity ?? 88}';
+        }
       });
     `;
   }
 
   if (page === 'vision') {
     updater = `
-      // Update sabotage probability
-      document.querySelectorAll('p, span, h2, h3').forEach(function(el) {
-        var t = (el.textContent || '').trim();
-        if (t === '98.4%') el.textContent = '${vision?.confidence ?? 98.4}%';
+      // Update sabotage probability text
+      document.querySelectorAll('h2').forEach(function(el) {
+        if (el.textContent.trim() === '98.4%') el.textContent = '${vision?.confidence ?? 98.4}%';
+      });
+
+      // Update probability bar width
+      var probBar = document.querySelector('.bg-primary.w-\\\\[98\\\\.4\\\\%\\\\]');
+      if (probBar) probBar.style.width = '${vision?.confidence ?? 98.4}%';
+
+      // Update Live Feed location indicator
+      document.querySelectorAll('span').forEach(function(el) {
+        if (el.textContent.trim() === 'Live Feed // Sector 7G') {
+            el.textContent = 'Live Feed // ${vision?.stream_id ?? 'Sector 7G'}';
+        }
+      });
+
+      // Update Alert Description
+      document.querySelectorAll('p').forEach(function(el) {
+        if (el.textContent.indexOf('Critical Alert: Unrecognized hardware') !== -1) {
+            el.textContent = '${vision?.status ?? 'Critical Alert'}: ${vision?.description ?? 'Unrecognized hardware signature detected on primary actuator.'}'.toUpperCase();
+        }
+      });
+
+      // Update Sluice Resistance and Tidal Pressure (Dynamic derived stats)
+      document.querySelectorAll('span.font-headline').forEach(function(el) {
+        if (el.childNodes.length > 0 && el.childNodes[0].nodeType === 3) {
+            var text = el.childNodes[0].nodeValue.trim();
+            if (text === '14.2') el.childNodes[0].nodeValue = '${weather?.wind_speed ? (weather.wind_speed * 1.2).toFixed(1) : 14.2} ';
+            if (text === '8.9') el.childNodes[0].nodeValue = '${brine?.soil_salinity ? (brine.soil_salinity + 2.7).toFixed(1) : 8.9} ';
+        }
       });
     `;
   }
@@ -200,11 +214,6 @@ function buildDataInjectionScript(liveData, page) {
       document.querySelectorAll('span').forEach(function(el) {
         var t = (el.textContent || '').trim();
         if (t.match(/PHASE: PREPARATORY/i)) el.textContent = 'PHASE: ${(brine?.phase ?? 'Preparatory').toUpperCase()}';
-      });
-
-      // Update efficiency peak
-      document.querySelectorAll('span, p').forEach(function(el) {
-        var t = (el.textContent || '').trim();
         if (t === '84.2%') el.textContent = '${brine?.humidity ?? 84.2}%';
       });
 
@@ -213,6 +222,22 @@ function buildDataInjectionScript(liveData, page) {
         var t = (el.textContent || '').trim();
         if (t === '6.2') el.textContent = '${brine?.soil_salinity ?? 6.2}';
         if (t === 'STABLE') el.textContent = '${brine?.salinity_status ?? 'STABLE'}';
+        if (t === '7.8') el.textContent = '${brine?.soil_salinity ? (brine.soil_salinity + 1.6).toFixed(1) : 7.8}'; // Water PH Level
+      });
+
+      // Update AQI
+      document.querySelectorAll('h3').forEach(function(el) {
+        if (el.childNodes.length > 0 && el.childNodes[0].nodeType === 3) {
+            var text = el.childNodes[0].nodeValue.trim();
+            if (text === '24') el.childNodes[0].nodeValue = '${weather?.wind_speed ? weather.wind_speed * 2 : 24} ';
+        }
+      });
+
+      // Update Tide Flats / Location
+      document.querySelectorAll('p').forEach(function(el) {
+        if (el.textContent.trim() === 'Sector 4: Tide Flats') {
+            el.textContent = 'Sector 4: ${weather?.node_id ?? 'Tide Flats'}';
+        }
       });
     `;
   }
@@ -278,7 +303,7 @@ const VISION_SCAN_SCRIPT = `
     document.body.appendChild(canvas);
 
     // ── 2. Find the static feed image (keep it visible by default) ──
-    var feedImg = document.querySelector('img[alt*="CCTV"], img[alt*="sluice"], img[data-alt]');
+    var feedImg = document.querySelector('img[alt*="CCTV" i], img[alt*="sluice" i], img[data-alt*="sluice" i], img[data-alt*="CCTV" i]');
     var feedContainer = feedImg ? feedImg.parentElement : null;
     var videoEl = null;
     var isAnomalyActive = false;
@@ -338,25 +363,31 @@ const VISION_SCAN_SCRIPT = `
     }
     var btnContainer = dispatchBtn.parentNode;
 
+    // ── 5.5 Wrap buttons in a flex container to prevent layout squishing ──
+    var buttonGroup = document.createElement('div');
+    buttonGroup.style.cssText = 'display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0;';
+    btnContainer.insertBefore(buttonGroup, dispatchBtn);
+    buttonGroup.appendChild(dispatchBtn); // Moves dispatchBtn inside
+
     // ── 6. "SIMULATE ANOMALY" / "RESET FEED" button ──
     var anomalyBtn = document.createElement('button');
     anomalyBtn.id = 'amrit-anomaly-btn';
     anomalyBtn.className = dispatchBtn.className;
-    anomalyBtn.style.cssText = 'background:linear-gradient(135deg,#ac3149,#770326);margin-left:8px;';
+    anomalyBtn.style.cssText = 'background:linear-gradient(135deg,#ac3149,#770326); white-space: nowrap;';
     anomalyBtn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:4px;">' +
       '<span class="material-symbols-outlined" style="font-size:16px;" data-icon="warning">warning</span>' +
       'SIMULATE ANOMALY</span>';
-    btnContainer.insertBefore(anomalyBtn, dispatchBtn.nextSibling);
+    buttonGroup.appendChild(anomalyBtn);
 
     // ── 7. "SCAN MANAS" button ──
     var scanBtn = document.createElement('button');
     scanBtn.id = 'amrit-scan-manas-btn';
     scanBtn.className = dispatchBtn.className;
-    scanBtn.style.cssText = 'background:linear-gradient(135deg,#6d46c1,#6138b4);margin-left:8px;';
+    scanBtn.style.cssText = 'background:linear-gradient(135deg,#6d46c1,#6138b4); white-space: nowrap;';
     scanBtn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:4px;">' +
       '<span class="material-symbols-outlined" style="font-size:16px;" data-icon="frame_inspect">frame_inspect</span>' +
       'SCAN MANAS</span>';
-    btnContainer.insertBefore(scanBtn, anomalyBtn.nextSibling);
+    buttonGroup.appendChild(scanBtn);
 
     // ── 8. Anomaly toggle ──
     function activateAnomaly() {
@@ -374,6 +405,28 @@ const VISION_SCAN_SCRIPT = `
       // Visual alerts
       if (feedContainer) feedContainer.classList.add('amrit-anomaly-active');
       anomalyOverlay.style.display = '';
+
+      // Update Security Block in UI
+      document.querySelectorAll('p.font-body').forEach(function(el) {
+          if (el.textContent.trim() === 'Sabotage Probability' || el.textContent.trim() === 'SECURITY BREACHED') {
+              el.textContent = 'SECURITY BREACHED';
+              el.style.color = '#ac3149';
+              el.style.fontWeight = '900';
+              el.style.fontSize = '2.5rem';
+              el.style.lineHeight = '1';
+          }
+      });
+      document.querySelectorAll('span.text-secondary').forEach(function(el) {
+          if (el.textContent.trim() === 'Security Assessment' || el.textContent.trim() === 'CRITICAL ALERT') {
+              el.textContent = 'CRITICAL ALERT';
+              el.style.color = '#ac3149';
+          }
+      });
+      document.querySelectorAll('h2').forEach(function(el) {
+          if (el.textContent.indexOf('%') !== -1) {
+              el.style.display = 'none';
+          }
+      });
 
       // Button → RESET FEED
       anomalyBtn.style.cssText = 'background:linear-gradient(135deg,#16a34a,#15803d);margin-left:8px;';
@@ -397,6 +450,28 @@ const VISION_SCAN_SCRIPT = `
       // Remove alerts
       if (feedContainer) feedContainer.classList.remove('amrit-anomaly-active');
       anomalyOverlay.style.display = 'none';
+
+      // Reset Security Block in UI
+      document.querySelectorAll('p.font-body').forEach(function(el) {
+          if (el.textContent.trim() === 'SECURITY BREACHED') {
+              el.textContent = 'Sabotage Probability';
+              el.style.color = '';
+              el.style.fontWeight = '';
+              el.style.fontSize = '';
+              el.style.lineHeight = '';
+          }
+      });
+      document.querySelectorAll('span').forEach(function(el) {
+          if (el.textContent.trim() === 'CRITICAL ALERT') {
+              el.textContent = 'Security Assessment';
+              el.style.color = '';
+          }
+      });
+      document.querySelectorAll('h2').forEach(function(el) {
+          if (el.style.display === 'none' && el.textContent.indexOf('%') !== -1) {
+              el.style.display = '';
+          }
+      });
 
       // Button → SIMULATE ANOMALY
       anomalyBtn.style.cssText = 'background:linear-gradient(135deg,#ac3149,#770326);margin-left:8px;';
@@ -542,6 +617,7 @@ function App() {
   });
 
   const [liveData, setLiveData] = useState(null);
+  const [evaporationScore, setEvaporationScore] = useState(14.2);
   const [dbStatus, setDbStatus] = useState('connecting');
   const iframeRef = useRef(null);
 
@@ -574,6 +650,10 @@ function App() {
       // Fetch data either way (dataService falls back to defaults)
       const data = await fetchAllData();
       setLiveData(data);
+
+      // Fetch the latest evaporation score
+      const latestScore = await fetchLatestEvaporationScore();
+      setEvaporationScore(latestScore);
     }
 
     init();
@@ -596,6 +676,19 @@ function App() {
     channels.push(
       subscribeToBrine((newRow) => {
         setLiveData((prev) => prev ? { ...prev, brine: newRow } : prev);
+      })
+    );
+    channels.push(
+      subscribeToEvaporationLogs((newRow) => {
+        if (newRow?.score != null) {
+          setEvaporationScore(newRow.score);
+          // Also update the weather.evaporation_score in liveData so the gauge syncs
+          setLiveData((prev) => prev ? {
+            ...prev,
+            weather: { ...prev.weather, evaporation_score: newRow.score }
+          } : prev);
+          console.log('[Amrit] 📊 Evaporation Gauge updated in real-time:', newRow.score);
+        }
       })
     );
 

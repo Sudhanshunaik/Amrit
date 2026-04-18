@@ -108,7 +108,23 @@ CREATE POLICY "Allow anonymous write" ON brine_analytics FOR ALL USING (true) WI
 CREATE POLICY "Allow anonymous write" ON farmer_profiles FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow anonymous write" ON subsidies FOR ALL USING (true) WITH CHECK (true);
 
+-- 6. Evaporation Logs (for real-time Evaporation Gauge updates)
+CREATE TABLE IF NOT EXISTS evaporation_logs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  node_id TEXT NOT NULL DEFAULT 'ESTUARY_04',
+  score NUMERIC NOT NULL DEFAULT 14.2,
+  recorded_at TIMESTAMPTZ DEFAULT now()
+);
+
+INSERT INTO evaporation_logs (node_id, score)
+VALUES ('ESTUARY_04', 14.2);
+
+ALTER TABLE evaporation_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow anonymous read" ON evaporation_logs FOR SELECT USING (true);
+CREATE POLICY "Allow anonymous write" ON evaporation_logs FOR ALL USING (true) WITH CHECK (true);
+
 -- Enable realtime on key tables
 ALTER PUBLICATION supabase_realtime ADD TABLE weather_data;
 ALTER PUBLICATION supabase_realtime ADD TABLE vision_alerts;
 ALTER PUBLICATION supabase_realtime ADD TABLE brine_analytics;
+ALTER PUBLICATION supabase_realtime ADD TABLE evaporation_logs;
