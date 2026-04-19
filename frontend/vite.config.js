@@ -11,6 +11,8 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/n8n/, ''),
         secure: true,
+        timeout: 120000,
+        proxyTimeout: 120000,
       },
     },
   },

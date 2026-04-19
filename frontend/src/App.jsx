@@ -601,92 +601,358 @@ const VISION_SCAN_SCRIPT = `
 const CHATBOT_SCRIPT = `
 <script>
 (function() {
-  function wireChatbot() {
-    var input = document.getElementById('chat-input');
-    var sendBtn = document.getElementById('chat-send-btn');
+  function wireVoiceAgent() {
     var historyDiv = document.getElementById('chat-history');
-    if (!input || !sendBtn || !historyDiv) return;
+    if (!historyDiv) return;
 
-    var sessionId = sessionStorage.getItem('amrit-chat-session');
-    if (!sessionId) {
-      sessionId = 'session_' + Math.random().toString(36).substring(2, 9);
-      sessionStorage.setItem('amrit-chat-session', sessionId);
+    var vs = document.createElement('style');
+    vs.textContent = [
+      '@keyframes amritPulse{0%,100%{opacity:1}50%{opacity:0.4}}',
+      '@keyframes amritSlideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}',
+      '@keyframes amritMicRecord{0%,100%{box-shadow:0 0 0 0 rgba(173,53,10,0.5)}50%{box-shadow:0 0 0 24px rgba(173,53,10,0)}}',
+      '@keyframes amritWaveFast{0%,100%{height:12px;opacity:0.4}50%{height:48px;opacity:1}}',
+      '.amrit-status-banner{display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:12px;margin-bottom:12px;font-family:Space Grotesk,Inter,sans-serif;font-size:12px;font-weight:600;letter-spacing:0.5px;animation:amritSlideDown 0.3s ease-out;}',
+      '.amrit-status-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}',
+      '.amrit-status-banner.connected{background:rgba(34,197,94,0.10);color:#15803d;box-shadow:inset 0 0 0 1px rgba(34,197,94,0.3)}',
+      '.amrit-status-banner.connected .amrit-status-dot{background:#22c55e;animation:amritPulse 2s infinite}',
+      '.amrit-recording .audio-wave-bar{animation-name:amritWaveFast !important;animation-duration:0.5s !important;}',
+      '.amrit-recording-pulse{animation:amritMicRecord 1.2s ease-in-out infinite;}'
+    ].join('\\n');
+    document.head.appendChild(vs);
+
+    var webhookUrl = '/api/n8n/webhook-test/voice-agent';
+    
+    var banner = document.createElement('div');
+    banner.id = 'amrit-webhook-status';
+    banner.className = 'amrit-status-banner connected';
+    banner.style.display = 'none';
+    banner.innerHTML = '<span class="amrit-status-dot"></span><span>n8n Voice Agent workflow is active</span>';
+    historyDiv.parentNode.insertBefore(banner, historyDiv);
+
+    var isWorkflowActive = false;
+    var retryInterval = null;
+
+    async function checkWebhookHealth() {
+      try {
+        var res = await fetch(webhookUrl, { method: 'GET' });
+        if (res.status === 405 || res.ok) {
+          isWorkflowActive = true;
+          banner.style.display = 'flex';
+          if (retryInterval) { clearInterval(retryInterval); retryInterval = null; }
+        } else {
+          throw new Error(res.status);
+        }
+      } catch(err) {
+        isWorkflowActive = false;
+        banner.style.display = 'none';
+        if (!retryInterval) retryInterval = setInterval(checkWebhookHealth, 15000);
+      }
     }
+    checkWebhookHealth();
 
     function appendMessage(text, isUser) {
-      var msgDiv = document.createElement('div');
-      msgDiv.className = isUser 
+      if (!text) return null;
+      var d = document.createElement('div');
+      d.className = isUser
         ? "self-end max-w-[85%] bg-primary-container p-4 rounded-[24px] rounded-tr-sm text-on-primary-container shadow-sm"
         : "self-start max-w-[85%] bg-surface-container p-5 rounded-[24px] rounded-tl-sm text-on-surface shadow-sm";
       if (!isUser) {
-          msgDiv.innerHTML = '<div class="flex items-center gap-2 mb-2"><span class="material-symbols-outlined text-primary text-sm" data-icon="auto_awesome">auto_awesome</span><span class="font-label text-[10px] uppercase tracking-tighter text-primary font-bold">Amrit Assistant</span></div><p class="font-body text-sm leading-relaxed">' + (text || '').replace(/\\n/g, '<br>') + '</p>';
+        d.innerHTML = '<div class="flex items-center gap-2 mb-2"><span class="material-symbols-outlined text-primary text-sm" data-icon="auto_awesome">auto_awesome</span><span class="font-label text-[10px] uppercase tracking-tighter text-primary font-bold">Amrit Voice Agent</span></div><p class="font-body text-sm leading-relaxed">' + text + '</p>';
       } else {
-          msgDiv.innerHTML = '<p class="font-body text-sm leading-relaxed font-medium">' + (text || '').replace(/\\n/g, '<br>') + '</p>';
+        d.innerHTML = '<p class="font-body text-sm leading-relaxed font-medium">' + text + '</p>';
       }
-      historyDiv.appendChild(msgDiv);
+      historyDiv.appendChild(d);
       historyDiv.scrollTop = historyDiv.scrollHeight;
-      return msgDiv;
+      return d;
     }
 
-    async function sendMessage() {
-      var text = input.value.trim();
-      if (!text) return;
+    function appendAudioPlayer(blob) {
+      var url = URL.createObjectURL(blob);
+      var d = document.createElement('div');
+      d.className = 'self-start max-w-[85%] bg-surface-container p-5 rounded-[24px] rounded-tl-sm text-on-surface shadow-sm';
+      d.innerHTML = '<div class="flex items-center gap-2 mb-2"><span class="material-symbols-outlined text-primary text-sm" data-icon="auto_awesome">auto_awesome</span><span class="font-label text-[10px] uppercase tracking-tighter text-primary font-bold">Amrit Voice Agent</span></div>' +
+        '<audio controls autoplay style="width:100%;border-radius:12px;margin-top:8px;"><source src="' + url + '" type="audio/wav">Your browser does not support audio.</audio>';
+      historyDiv.appendChild(d);
+      historyDiv.scrollTop = historyDiv.scrollHeight;
+    }
 
-      input.value = '';
-      appendMessage(text, true);
+    var heroSection = document.querySelector('section.flex.flex-col.items-center.justify-center');
+    var heroTitle = heroSection ? heroSection.querySelector('h2') : null;
+    var heroSubtitle = heroSection ? heroSection.querySelector('p.font-label') : null;
+    var waveContainer = heroSection ? heroSection.querySelector('.relative.flex.items-center') : null;
 
-      // Loading pulse
-      var loadingDiv = appendMessage('...', false);
+    var isRecording = false;
+    var mediaRecorder = null;
+    var audioChunks = [];
 
-      try {
-        var response = await fetch('/api/n8n/webhook/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: sessionId, chatInput: text, message: text, text: text })
-        });
-
-        if (!response.ok) throw new Error('Webhook returned ' + response.status);
-        
-        var rawText = await response.text();
-        var data;
-        try {
-            data = JSON.parse(rawText);
-        } catch(e) {
-            data = rawText; // Fallback for raw text responses from n8n
-        }
-        
-        loadingDiv.remove();
-        
-        var replyText = '';
-        if (typeof data === 'string') {
-            replyText = data;
-        } else {
-            // Support common n8n return formats
-            replyText = data.output || data.response || data.message || data.text;
-            if (!replyText) replyText = JSON.stringify(data);
-        }
-
-        appendMessage(replyText, false);
-
-      } catch(err) {
-        console.error('[Amrit Chat Error]', err);
-        loadingDiv.remove();
-        appendMessage('⚠ Connection Error: Webhook returned 404. Please ensure your n8n workflow is active, or hit "Listen for test event".', false);
+    function updateHeroState(state) {
+      if (!heroTitle) return;
+      if (state === 'idle') {
+        heroTitle.textContent = 'Tap to Speak';
+        if (heroSubtitle) { heroSubtitle.textContent = 'Subsidy Navigator Active'; heroSubtitle.style.color = ''; }
+        if (waveContainer) waveContainer.classList.remove('amrit-recording');
+        if (heroSection) heroSection.classList.remove('amrit-recording-pulse');
+      } else if (state === 'recording') {
+        heroTitle.textContent = 'Listening...';
+        if (heroSubtitle) { heroSubtitle.textContent = 'Speak now — tap again to stop'; heroSubtitle.style.color = '#ad350a'; }
+        if (waveContainer) waveContainer.classList.add('amrit-recording');
+        if (heroSection) heroSection.classList.add('amrit-recording-pulse');
+      } else if (state === 'sending') {
+        heroTitle.textContent = 'Processing...';
+        if (heroSubtitle) { heroSubtitle.textContent = 'Sending audio to Amrit AI'; heroSubtitle.style.color = '#6d46c1'; }
+        if (waveContainer) waveContainer.classList.remove('amrit-recording');
+        if (heroSection) heroSection.classList.remove('amrit-recording-pulse');
       }
     }
 
-    sendBtn.addEventListener('click', sendMessage);
-    input.addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') sendMessage();
+    async function startRecording() {
+      try {
+        var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunks = [];
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+        mediaRecorder.ondataavailable = function(e) { if (e.data.size > 0) audioChunks.push(e.data); };
+        mediaRecorder.onstop = async function() {
+          stream.getTracks().forEach(function(t) { t.stop(); });
+          var audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          updateHeroState('sending');
+          appendMessage('🎤 Voice message sent', true);
+          var ld = appendMessage('🔊 Processing your voice...', false);
+
+          try {
+            var controller = new AbortController();
+            var timeout = setTimeout(function(){ controller.abort(); }, 120000);
+            
+            var r = await fetch(webhookUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'audio/webm' },
+              body: audioBlob,
+              signal: controller.signal
+            });
+            clearTimeout(timeout);
+            
+            if (!r.ok) throw new Error('Webhook returned ' + r.status);
+            
+            ld.remove();
+            
+            var ct = r.headers.get('content-type') || '';
+            if (ct.indexOf('audio') !== -1) {
+              var respBlob = await r.blob();
+              appendAudioPlayer(respBlob);
+            } else {
+              var raw = await r.text();
+              var data; try { data = JSON.parse(raw); } catch(e) { data = raw; }
+              var reply = typeof data === 'string' ? data : (data.output || data.response || data.message || data.text || JSON.stringify(data));
+              appendMessage(reply, false);
+            }
+            if (!isWorkflowActive) { isWorkflowActive = true; banner.style.display = 'flex'; }
+          } catch(err) {
+            ld.remove();
+            var emsg = err.name === 'AbortError' ? 'Request timed out (120s).' : err.message;
+            appendMessage('⚠ Voice agent error: ' + emsg, false);
+          }
+          updateHeroState('idle');
+        };
+        mediaRecorder.start();
+        isRecording = true;
+        updateHeroState('recording');
+      } catch(err) {
+        appendMessage('🎤 Microphone error: ' + err.message + '. Please allow microphone access.', false);
+        updateHeroState('idle');
+      }
+    }
+
+    function stopRecording() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        isRecording = false;
+      }
+    }
+
+    function toggleRecording(e) {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      if (isRecording) { stopRecording(); } else { startRecording(); }
+    }
+
+    if (heroTitle) heroTitle.textContent = 'Tap to Speak';
+    if (heroSection) {
+      heroSection.style.cursor = 'pointer';
+      heroSection.addEventListener('click', toggleRecording);
+    }
+
+    // Bind to the mic buttons
+    document.querySelectorAll('span.material-symbols-outlined').forEach(function(icon) {
+      var name = (icon.getAttribute('data-icon') || icon.textContent || '').trim();
+      if (name === 'keyboard_voice' || name === 'mic') {
+        var btn = icon.closest('a') || icon.closest('button') || icon;
+        btn.addEventListener('click', function(e) {
+          e.preventDefault(); e.stopPropagation();
+          toggleRecording(e);
+        });
+      }
     });
 
-    console.log('[Amrit] ✅ Chatbot interface wired to ' + 'https://sudhanshunaik647.app.n8n.cloud/webhook/chat');
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', wireChatbot);
+    document.addEventListener('DOMContentLoaded', wireVoiceAgent);
   } else {
-    setTimeout(wireChatbot, 200);
+    setTimeout(wireVoiceAgent, 200);
+  }
+})();
+</script>
+`;
+
+const DASHBOARD_MIC_SCRIPT = `
+<script>
+(function() {
+  function wireDashboardMic() {
+    var micStyle = document.createElement('style');
+    micStyle.textContent = [
+      '@keyframes dashWaveFast{0%,100%{height:12px;opacity:0.4}50%{height:24px;opacity:1}}',
+      '@keyframes dashMicPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}',
+      '@keyframes dashMicRing{0%{transform:scale(0.8);opacity:1}100%{transform:scale(1.5);opacity:0}}',
+      '.amrit-dash-recording{animation:dashMicPulse 1s ease-in-out infinite !important;}',
+      '.amrit-dash-recording-ring{position:absolute;inset:0;border-radius:50%;border:2px solid rgba(109,70,193,0.4);animation:dashMicRing 1.5s ease-out infinite;pointer-events:none;}',
+      '.amrit-dash-wave-active > div{animation-name:dashWaveFast !important;animation-duration:0.4s !important;}',
+    ].join('\\n');
+    document.head.appendChild(micStyle);
+
+    var micIcons = document.querySelectorAll('span.material-symbols-outlined');
+    var micBtn = null;
+    var micCircle = null;
+    var waveDiv = null;
+    var listeningLabel = null;
+    var tapLabel = null;
+
+    micIcons.forEach(function(icon) {
+      var iconName = (icon.getAttribute('data-icon') || icon.textContent || '').trim();
+      if (iconName === 'mic') {
+        var parentBtn = icon.closest('button');
+        if (parentBtn && !parentBtn.closest('nav')) {
+          micBtn = parentBtn;
+          micCircle = icon.closest('div.bg-secondary, div[class*="bg-secondary"]');
+          var section = parentBtn.closest('section');
+          if (section) {
+            waveDiv = section.querySelector('.flex.items-center.gap-1\\\\.5');
+          }
+          var labels = parentBtn.querySelectorAll('span');
+          labels.forEach(function(l) {
+            if ((l.textContent || '').indexOf('Listening') !== -1 || (l.textContent || '').indexOf('LISTENING') !== -1) listeningLabel = l;
+            if ((l.textContent || '').indexOf('Tap to speak') !== -1) tapLabel = l;
+          });
+        }
+      }
+    });
+
+    if (!micBtn) return;
+
+    var webhookUrl = '/api/n8n/webhook-test/voice-agent';
+    var isRecording = false;
+    var mediaRecorder = null;
+    var audioChunks = [];
+
+    function showToast(msg, isErr) {
+      var old = document.getElementById('amrit-mic-toast');
+      if (old) old.remove();
+      var t = document.createElement('div');
+      t.id = 'amrit-mic-toast';
+      t.style.cssText = 'position:fixed;top:80px;right:16px;z-index:9999;max-width:380px;padding:16px 20px;border-radius:12px;font-family:Space Grotesk,sans-serif;font-size:13px;color:#fff;box-shadow:0 8px 32px rgba(0,0,0,0.25);backdrop-filter:blur(12px);animation:amritSlideDown 0.3s ease-out;word-break:break-word;background:' + (isErr ? 'rgba(172,49,73,0.95)' : 'rgba(109,70,193,0.95)') + ';';
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(function() { t.style.transition='opacity 0.5s'; t.style.opacity='0'; setTimeout(function(){t.remove();},500); }, 5000);
+    }
+
+    function setRecordingUI(on) {
+      if (micCircle) {
+        if (on) {
+          micCircle.classList.add('amrit-dash-recording');
+          micCircle.style.position = 'relative';
+          var ring = document.createElement('div');
+          ring.className = 'amrit-dash-recording-ring';
+          ring.id = 'amrit-ring';
+          micCircle.appendChild(ring);
+        } else {
+          micCircle.classList.remove('amrit-dash-recording');
+          var ring = document.getElementById('amrit-ring');
+          if (ring) ring.remove();
+        }
+      }
+      if (waveDiv) {
+        on ? waveDiv.classList.add('amrit-dash-wave-active') : waveDiv.classList.remove('amrit-dash-wave-active');
+      }
+      if (listeningLabel) listeningLabel.textContent = on ? 'RECORDING...' : 'LISTENING...';
+      if (tapLabel) tapLabel.textContent = on ? 'Tap again to stop and send' : 'Tap to speak in Konkani or Marathi.';
+    }
+
+    async function startRec() {
+      try {
+        var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunks = [];
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+        mediaRecorder.ondataavailable = function(e) { if (e.data.size > 0) audioChunks.push(e.data); };
+        mediaRecorder.onstop = async function() {
+          stream.getTracks().forEach(function(t){ t.stop(); });
+          var blob = new Blob(audioChunks, { type: 'audio/webm' });
+          setRecordingUI(false);
+          if (listeningLabel) listeningLabel.textContent = 'SENDING...';
+          if (tapLabel) tapLabel.textContent = 'Processing your voice...';
+          showToast('🎤 Sending voice to Amrit AI...', false);
+          
+          try {
+            var controller = new AbortController();
+            var tmout = setTimeout(function(){ controller.abort(); }, 120000);
+            
+            var r = await fetch(webhookUrl, { method:'POST', headers:{'Content-Type':'audio/webm'}, body: blob, signal: controller.signal });
+            clearTimeout(tmout);
+            
+            if (!r.ok) throw new Error('Status ' + r.status);
+            
+            var ct = r.headers.get('content-type') || '';
+            if (ct.indexOf('audio') !== -1) {
+              var audioBlob = await r.blob();
+              var url = URL.createObjectURL(audioBlob);
+              var audio = new Audio(url);
+              audio.play();
+              showToast('🔊 Playing response from Amrit AI', false);
+            } else {
+              var raw = await r.text();
+              var data; try{data=JSON.parse(raw);}catch(e){data=raw;}
+              var reply = typeof data==='string' ? data : (data.output||data.response||data.message||data.text||JSON.stringify(data));
+              showToast('💬 ' + reply.substring(0,100), false);
+            }
+          } catch(e) {
+            var emsg = e.name === 'AbortError' ? 'Timed out (120s)' : e.message;
+            showToast('⚠ Voice agent error: ' + emsg, true);
+          }
+          if (listeningLabel) listeningLabel.textContent = 'LISTENING...';
+          if (tapLabel) tapLabel.textContent = 'Tap to speak in Konkani or Marathi.';
+        };
+        mediaRecorder.start();
+        isRecording = true;
+        setRecordingUI(true);
+      } catch(e) {
+        showToast('🎤 Mic error: ' + e.message, true);
+      }
+    }
+
+    function stopRec() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        isRecording = false;
+      }
+    }
+
+    micBtn.addEventListener('click', function(e) {
+      e.preventDefault(); e.stopPropagation();
+      isRecording ? stopRec() : startRec();
+    });
+
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wireDashboardMic);
+  } else {
+    setTimeout(wireDashboardMic, 300);
   }
 })();
 </script>
@@ -725,8 +991,9 @@ function injectScripts(html, liveData, page) {
   const dataScript = buildDataInjectionScript(liveData, page);
   const scanScript = (page === 'dashboard' || page === 'vision') ? VISION_SCAN_SCRIPT : '';
   const chatScript = page === 'voice' ? CHATBOT_SCRIPT : '';
+  const dashMicScript = page === 'dashboard' ? DASHBOARD_MIC_SCRIPT : '';
   const fabScript = page !== 'voice' ? FAB_SCRIPT : '';
-  return html.replace('</body>', NAV_INJECTION_SCRIPT + dataScript + scanScript + chatScript + fabScript + '</body>');
+  return html.replace('</body>', NAV_INJECTION_SCRIPT + dataScript + scanScript + chatScript + dashMicScript + fabScript + '</body>');
 }
 
 function App() {
