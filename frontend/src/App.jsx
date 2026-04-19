@@ -598,10 +598,135 @@ const VISION_SCAN_SCRIPT = `
 </script>
 `;
 
+const CHATBOT_SCRIPT = `
+<script>
+(function() {
+  function wireChatbot() {
+    var input = document.getElementById('chat-input');
+    var sendBtn = document.getElementById('chat-send-btn');
+    var historyDiv = document.getElementById('chat-history');
+    if (!input || !sendBtn || !historyDiv) return;
+
+    var sessionId = sessionStorage.getItem('amrit-chat-session');
+    if (!sessionId) {
+      sessionId = 'session_' + Math.random().toString(36).substring(2, 9);
+      sessionStorage.setItem('amrit-chat-session', sessionId);
+    }
+
+    function appendMessage(text, isUser) {
+      var msgDiv = document.createElement('div');
+      msgDiv.className = isUser 
+        ? "self-end max-w-[85%] bg-primary-container p-4 rounded-[24px] rounded-tr-sm text-on-primary-container shadow-sm"
+        : "self-start max-w-[85%] bg-surface-container p-5 rounded-[24px] rounded-tl-sm text-on-surface shadow-sm";
+      if (!isUser) {
+          msgDiv.innerHTML = '<div class="flex items-center gap-2 mb-2"><span class="material-symbols-outlined text-primary text-sm" data-icon="auto_awesome">auto_awesome</span><span class="font-label text-[10px] uppercase tracking-tighter text-primary font-bold">Amrit Assistant</span></div><p class="font-body text-sm leading-relaxed">' + (text || '').replace(/\\n/g, '<br>') + '</p>';
+      } else {
+          msgDiv.innerHTML = '<p class="font-body text-sm leading-relaxed font-medium">' + (text || '').replace(/\\n/g, '<br>') + '</p>';
+      }
+      historyDiv.appendChild(msgDiv);
+      historyDiv.scrollTop = historyDiv.scrollHeight;
+      return msgDiv;
+    }
+
+    async function sendMessage() {
+      var text = input.value.trim();
+      if (!text) return;
+
+      input.value = '';
+      appendMessage(text, true);
+
+      // Loading pulse
+      var loadingDiv = appendMessage('...', false);
+
+      try {
+        var response = await fetch('/api/n8n/webhook/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: sessionId, chatInput: text, message: text, text: text })
+        });
+
+        if (!response.ok) throw new Error('Webhook returned ' + response.status);
+        
+        var rawText = await response.text();
+        var data;
+        try {
+            data = JSON.parse(rawText);
+        } catch(e) {
+            data = rawText; // Fallback for raw text responses from n8n
+        }
+        
+        loadingDiv.remove();
+        
+        var replyText = '';
+        if (typeof data === 'string') {
+            replyText = data;
+        } else {
+            // Support common n8n return formats
+            replyText = data.output || data.response || data.message || data.text;
+            if (!replyText) replyText = JSON.stringify(data);
+        }
+
+        appendMessage(replyText, false);
+
+      } catch(err) {
+        console.error('[Amrit Chat Error]', err);
+        loadingDiv.remove();
+        appendMessage('⚠ Connection Error: Webhook returned 404. Please ensure your n8n workflow is active, or hit "Listen for test event".', false);
+      }
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    input.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+    console.log('[Amrit] ✅ Chatbot interface wired to ' + 'https://sudhanshunaik647.app.n8n.cloud/webhook/chat');
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wireChatbot);
+  } else {
+    setTimeout(wireChatbot, 200);
+  }
+})();
+</script>
+`;
+
+const FAB_SCRIPT = `
+<script>
+(function() {
+  function injectFAB() {
+    var fab = document.createElement('div');
+    fab.id = 'amrit-global-chat-fab';
+    fab.style.cssText = 'position:fixed; bottom: 100px; right: 24px; z-index: 9999; animation: slideIn 0.3s ease-out;';
+    fab.innerHTML = '<button style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#ad350a,#9b2a00);color:white;box-shadow:0 8px 32px rgba(173,53,10,0.4);display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\\'scale(1.05)\\'" onmouseout="this.style.transform=\\'scale(1)\\'" onmousedown="this.style.transform=\\'scale(0.95)\\'">' + 
+                    '<span class="material-symbols-outlined" style="font-size:28px;">smart_toy</span></button>';
+    
+    if (!document.getElementById('amrit-animations')) {
+      var style = document.createElement('style');
+      style.id = 'amrit-animations';
+      style.innerHTML = '@keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }';
+      document.head.appendChild(style);
+    }
+    
+    fab.onclick = function(e) {
+      e.preventDefault(); e.stopPropagation();
+      window.parent.postMessage({ type: 'amrit-nav', tab: 'voice' }, '*');
+    };
+    
+    document.body.appendChild(fab);
+  }
+  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', injectFAB); } else { injectFAB(); }
+})();
+</script>
+`;
+
 function injectScripts(html, liveData, page) {
   const dataScript = buildDataInjectionScript(liveData, page);
   const scanScript = (page === 'dashboard' || page === 'vision') ? VISION_SCAN_SCRIPT : '';
-  return html.replace('</body>', NAV_INJECTION_SCRIPT + dataScript + scanScript + '</body>');
+  const chatScript = page === 'voice' ? CHATBOT_SCRIPT : '';
+  const fabScript = page !== 'voice' ? FAB_SCRIPT : '';
+  return html.replace('</body>', NAV_INJECTION_SCRIPT + dataScript + scanScript + chatScript + fabScript + '</body>');
 }
 
 function App() {
