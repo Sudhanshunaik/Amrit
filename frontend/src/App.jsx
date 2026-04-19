@@ -239,6 +239,66 @@ function buildDataInjectionScript(liveData, page) {
             el.textContent = 'Sector 4: ${weather?.node_id ?? 'Tide Flats'}';
         }
       });
+
+      // ── INJECT KONKANI AI ADVISORY ──
+      (function() {
+        if (document.getElementById('amrit-konkani-card')) return;
+        var main = document.querySelector('main');
+        var grid = document.querySelector('main .grid');
+        if (!main || !grid) return;
+
+        var card = document.createElement('div');
+        card.id = 'amrit-konkani-card';
+        card.className = 'w-full mb-8 rounded-[24px] overflow-hidden relative shadow-sm border border-secondary-container/30';
+        card.style.cssText = 'background: linear-gradient(135deg, rgba(109,70,193,0.06), rgba(173,53,10,0.04)); backdrop-filter: blur(12px);';
+        
+        card.innerHTML = '<div class="absolute top-0 left-0 w-2 h-full bg-gradient-to-b from-[#6d46c1] to-[#ad350a]"></div>' +
+          '<div class="px-8 py-6 flex flex-col md:flex-row gap-6 items-center">' +
+             '<div class="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center flex-shrink-0 animate-pulse" id="amrit-ai-icon-wrap">' +
+                '<span class="material-symbols-outlined text-transparent bg-clip-text bg-gradient-to-r from-[#6d46c1] to-[#ad350a] text-3xl">psychology</span>' +
+             '</div>' +
+             '<div class="flex-1">' +
+                '<h3 class="font-headline font-bold text-lg text-on-surface flex items-center gap-2 mb-2">' +
+                   'Amrit AI Farmer Advisory <span class="bg-[#ad350a] text-white text-[10px] px-2 py-0.5 rounded-full tracking-widest font-label">KONKANI</span>' +
+                '</h3>' +
+                '<p id="amrit-konkani-text" class="text-on-surface-variant text-sm font-medium leading-relaxed italic">' +
+                   'Generating daily khazan insights natively in Konkani based on current weather patterns...' +
+                '</p>' +
+             '</div>' +
+          '</div>';
+        
+        main.insertBefore(card, grid);
+
+        async function fetchKonkaniInsight() {
+           try {
+             var prompt = "You are Amrit AI, an agricultural assistant for salt farmers in Goa. " +
+               "Here is the database farm data: Temp: ${weather?.temperature}C, Humidity: ${weather?.humidity}%, Wind: ${weather?.wind_speed}km/h, Tide: ${weather?.tide_status}. " +
+               "Provide important insights about this weather and how it affects their khazan salt farming today. " +
+               "If the numerical data looks like dummy/0 values, give them general tips and tricks for traditional Goan salt farming instead. " +
+               "CRITICAL: Write the ENTIRE reply EXCLUSIVELY in Konkani (using Latin/Romi script). Keep it practical, encouraging, and maximum 3 sentences. No markdown.";
+             
+             var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyClOv8wEnW8ABedh5olbG07E4aGhSWAyqY', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: prompt }] }],
+                  generationConfig: { temperature: 0.7, maxOutputTokens: 150 }
+                })
+             });
+             if (!res.ok) throw new Error('API Error');
+             var data = await res.json();
+             var text = data.candidates[0].content.parts[0].text;
+             
+             document.getElementById('amrit-konkani-text').textContent = text;
+             document.getElementById('amrit-ai-icon-wrap').classList.remove('animate-pulse');
+           } catch(e) {
+             console.error('[Amrit] Konkani AI Error:', e);
+             document.getElementById('amrit-konkani-text').textContent = "Somzonni divnk okhant zalam. Internet connection check korat. (Failed to load insights)";
+             document.getElementById('amrit-ai-icon-wrap').classList.remove('animate-pulse');
+           }
+        }
+        fetchKonkaniInsight();
+      })();
     `;
   }
 
@@ -389,12 +449,22 @@ const VISION_SCAN_SCRIPT = `
       'SCAN MANAS</span>';
     buttonGroup.appendChild(scanBtn);
 
+    // ── 7.5 "LIVE FEED" button ──
+    var liveBtn = document.createElement('button');
+    liveBtn.id = 'amrit-live-manas-btn';
+    liveBtn.className = dispatchBtn.className;
+    liveBtn.style.cssText = 'background:linear-gradient(135deg,#0ea5e9,#0369a1); white-space: nowrap;';
+    liveBtn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:4px;">' +
+      '<span class="material-symbols-outlined" style="font-size:16px;" data-icon="videocam">videocam</span>' +
+      'LIVE FEED</span>';
+    buttonGroup.appendChild(liveBtn);
+
     // ── 8. Anomaly toggle ──
     function activateAnomaly() {
       isAnomalyActive = true;
 
       // Load and show video, hide image
-      if (videoEl) {
+      if (videoEl && !window.amritIsLiveActive) {
         videoEl.src = '/vision-feed.mp4';
         videoEl.load();
         videoEl.play();
@@ -527,12 +597,20 @@ const VISION_SCAN_SCRIPT = `
       try {
         var base64String;
 
-        if (isAnomalyActive && videoEl && videoEl.readyState >= 2) {
-          // Capture from anomaly video (same-origin, no CORS issue)
+        if ((isLiveActive || isAnomalyActive) && videoEl && videoEl.srcObject && videoEl.readyState >= 2) {
+          // Capture from live camera stream (DroidCam or webcam)
           canvas.width = videoEl.videoWidth || 640;
           canvas.height = videoEl.videoHeight || 360;
           var ctx = canvas.getContext('2d');
           ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+          base64String = canvas.toDataURL('image/jpeg', 0.85);
+          console.log('[Amrit] Frame captured from LIVE camera stream');
+        } else if (isAnomalyActive && videoEl && videoEl.readyState >= 2) {
+          // Capture from anomaly video (same-origin, no CORS issue)
+          canvas.width = videoEl.videoWidth || 640;
+          canvas.height = videoEl.videoHeight || 360;
+          var ctx2 = canvas.getContext('2d');
+          ctx2.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
           base64String = canvas.toDataURL('image/jpeg', 0.85);
           console.log('[Amrit] Frame captured from anomaly video');
         } else if (feedImg) {
@@ -564,6 +642,7 @@ const VISION_SCAN_SCRIPT = `
         }
 
         // POST to n8n
+        // If testing in n8n UI, use /webhook-test/, but we default to production /webhook/
         var response = await fetch('/api/n8n/webhook/vision-frame', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -573,7 +652,29 @@ const VISION_SCAN_SCRIPT = `
         if (!response.ok) throw new Error('n8n responded with status ' + response.status);
         var data = await response.json();
         console.log('[Amrit] n8n response:', data);
-        showToast('✅ Manas Scan Complete: ' + (data.message || data.result || JSON.stringify(data)), false);
+        
+        // Handle n8n response structure
+        var isSabotage = false;
+        var msg = data.message || JSON.stringify(data);
+        
+        // If n8n says "Workflow was started", we don't have the result yet (responseMode issue)
+        if (msg === 'Workflow was started') {
+           showToast('✅ Manas Scan Complete: AI Analysis Started (Ensure n8n uses responseMode: lastNode)', false);
+        } else {
+           // Parse the actual result from the workflow
+           var rawText = data.text || (data[0] && data[0].text) || (data.data && data.data[0] && data.data[0].text) || msg;
+           if (typeof rawText === 'string' && rawText.toUpperCase().includes('TRUE')) {
+               isSabotage = true;
+           }
+
+           if (isSabotage) {
+               showToast('🚨 Sluice Gate Warning: SABOTAGE DETECTED (Plank Removal)', true);
+               if (!isAnomalyActive) activateAnomaly();
+           } else {
+               showToast('✅ Manas Scan Complete: Feed is SECURE.', false);
+               if (isAnomalyActive) resetToNormal();
+           }
+        }
 
       } catch (err) {
         console.error('[Amrit] Scan Manas error:', err);
@@ -583,6 +684,142 @@ const VISION_SCAN_SCRIPT = `
         scanBtn.innerHTML = originalScanHTML;
         scanBtn.style.opacity = '1';
         scanBtn.style.pointerEvents = 'auto';
+      }
+    });
+
+    // ── 11. Live Monitoring Handler ──
+    var isLiveActive = false;
+    var liveInterval = null;
+    var originalLiveHTML = liveBtn.innerHTML;
+    var streamRef = null;
+
+    liveBtn.addEventListener('click', async function(e) {
+      e.preventDefault(); e.stopPropagation();
+      
+      if (isLiveActive) {
+          // Stop live
+          isLiveActive = false;
+          window.amritIsLiveActive = false;
+          clearInterval(liveInterval);
+          if (streamRef) streamRef.getTracks().forEach(function(t) { t.stop() });
+          liveBtn.innerHTML = originalLiveHTML;
+          liveBtn.style.cssText = 'background:linear-gradient(135deg,#0ea5e9,#0369a1); white-space: nowrap;';
+          if (videoEl) { videoEl.pause(); videoEl.srcObject = null; videoEl.removeAttribute('src'); videoEl.style.opacity = '0'; }
+          if (feedImg) feedImg.style.opacity = '0.8';
+          showToast('⏸ Live Monitoring Stopped.', false);
+          return;
+      }
+
+      // Start live via Webcam
+      try {
+          resetToNormal(); // Clear any existing UI anomalies BEFORE trying to start the feed
+          
+          var constraints = { video: { facingMode: 'environment' } };
+          
+          // Use whatever device is selected in the dropdown if available
+          var camSelect = document.getElementById('amrit-cam-select');
+          if (camSelect && camSelect.value) {
+              constraints.video = { deviceId: { exact: camSelect.value } };
+          }
+          
+          var stream = await navigator.mediaDevices.getUserMedia(constraints);
+          streamRef = stream;
+
+          if (videoEl) {
+              videoEl.srcObject = stream;
+              videoEl.removeAttribute('src');
+              videoEl.style.zIndex = '50';
+              videoEl.style.background = '#000';
+              videoEl.style.border = 'none'; // removing the green debug border
+              videoEl.style.borderRadius = '24px'; // match the original image borders
+              videoEl.play().catch(e=>console.error('Play err',e));
+              videoEl.style.opacity = '1';
+          }
+          if (feedImg) feedImg.style.opacity = '0';
+          
+          // Populate the camera selector so they can switch
+          var devices = await navigator.mediaDevices.enumerateDevices();
+          var videoDevices = devices.filter(function(d) { return d.kind === 'videoinput' });
+          if (!camSelect) {
+              camSelect = document.createElement('select');
+              camSelect.id = 'amrit-cam-select';
+              camSelect.style.cssText = 'padding:0 8px; border-radius:12px; border:1px solid #ddd; background:#f9fafb; font-family:Inter; font-size:12px; color:#475569; max-width: 150px;';
+              // Insert it right before the Live Feed button
+              liveBtn.parentNode.insertBefore(camSelect, liveBtn);
+              
+              camSelect.onchange = async function() {
+                  console.log('[Amrit] 🔄 Switching camera to:', camSelect.value);
+                  if (streamRef) streamRef.getTracks().forEach(function(t) { t.stop() });
+                  try {
+                      var newStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: camSelect.value } } });
+                      streamRef = newStream;
+                      if (videoEl) {
+                          videoEl.srcObject = newStream;
+                          videoEl.play().catch(function(e){ console.error('Play err', e) });
+                      }
+                  } catch (e) {
+                      console.error('[Amrit] Camera switch error:', e);
+                      // Avoid showing a toast if they just clicked the dropdown while it was loading, etc.
+                  }
+              };
+          }
+          
+          camSelect.innerHTML = '';
+          videoDevices.forEach(function(d) {
+              var opt = document.createElement('option');
+              opt.value = d.deviceId;
+              opt.text = d.label || 'Camera ' + (camSelect.length + 1);
+              if (streamRef.getVideoTracks()[0] && d.label === streamRef.getVideoTracks()[0].label) opt.selected = true;
+              camSelect.appendChild(opt);
+          });
+          camSelect.style.display = 'inline-block';
+          if (feedImg) feedImg.style.opacity = '0';
+          
+          isLiveActive = true;
+          window.amritIsLiveActive = true;
+          isAnomalyActive = false;
+          liveBtn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:6px;">' +
+            '<span class="amrit-anomaly-dot" style="background:#fff;"></span>' +
+            'MONITORING...</span>';
+          liveBtn.style.cssText = 'background:linear-gradient(135deg,#c2410c,#9a3412); white-space: nowrap;';
+          showToast('🟢 Live feed active. AI analyzing environment...', false);
+
+          liveInterval = setInterval(async function() {
+              if (!isLiveActive || isAnomalyActive) return;
+              try {
+                  canvas.width = videoEl.videoWidth || 640;
+                  canvas.height = videoEl.videoHeight || 360;
+                  var ctx = canvas.getContext('2d');
+                  ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+                  var base64Str = canvas.toDataURL('image/jpeg', 0.6);
+
+                  var endpoint = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && false ? '/api/n8n/webhook-test/vision-frame' : '/api/n8n/webhook/vision-frame';
+                  
+                  var response = await fetch(endpoint, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ image: base64Str })
+                  });
+                  if (!response.ok) return;
+                  var data = await response.json();
+                  var msg = data.message || JSON.stringify(data);
+                  if (msg === 'Workflow was started') return;
+                  
+                  var rawText = data.text || (data[0] && data[0].text) || (data.data && data.data[0] && data.data[0].text) || msg;
+                  if (typeof rawText === 'string' && rawText.toUpperCase().includes('TRUE')) {
+                      // Trigger lock down
+                      activateAnomaly();
+                      clearInterval(liveInterval);
+                      isLiveActive = false;
+                      liveBtn.innerHTML = originalLiveHTML;
+                      liveBtn.style.cssText = 'background:linear-gradient(135deg,#0ea5e9,#0369a1); white-space: nowrap;';
+                      if (streamRef) streamRef.getTracks().forEach(function(t) { t.stop() });
+                      showToast('🚨 LIVE FEED DETECTED CRITICAL SABOTAGE!', true);
+                  }
+              } catch(err) { console.error('Live fetch error:', err); }
+          }, 5000); 
+      } catch(err) {
+          showToast('⚠ Camera access denied: Please allow permissions or run on localhost/https.', true);
       }
     });
 
@@ -620,7 +857,7 @@ const CHATBOT_SCRIPT = `
     ].join('\\n');
     document.head.appendChild(vs);
 
-    var webhookUrl = '/api/n8n/webhook-test/voice-agent';
+    var webhookUrl = '/api/n8n/webhook-test/free-voice-agent';
     
     var banner = document.createElement('div');
     banner.id = 'amrit-webhook-status';
@@ -722,10 +959,12 @@ const CHATBOT_SCRIPT = `
             var controller = new AbortController();
             var timeout = setTimeout(function(){ controller.abort(); }, 120000);
             
+            var formData = new FormData();
+            formData.append('user_audio', audioBlob, 'recording.webm');
+            
             var r = await fetch(webhookUrl, {
               method: 'POST',
-              headers: { 'Content-Type': 'audio/webm' },
-              body: audioBlob,
+              body: formData,
               signal: controller.signal
             });
             clearTimeout(timeout);
@@ -735,11 +974,14 @@ const CHATBOT_SCRIPT = `
             ld.remove();
             
             var ct = r.headers.get('content-type') || '';
-            if (ct.indexOf('audio') !== -1) {
+            console.log('[Amrit Voice] Received Content-Type:', ct);
+            if (ct.indexOf('audio') !== -1 || ct.indexOf('application/octet-stream') !== -1) {
+              console.log('[Amrit Voice] Playing as audio blob');
               var respBlob = await r.blob();
               appendAudioPlayer(respBlob);
             } else {
               var raw = await r.text();
+              console.log('[Amrit Voice] Received text response:', raw);
               var data; try { data = JSON.parse(raw); } catch(e) { data = raw; }
               var reply = typeof data === 'string' ? data : (data.output || data.response || data.message || data.text || JSON.stringify(data));
               appendMessage(reply, false);
@@ -790,6 +1032,94 @@ const CHATBOT_SCRIPT = `
         });
       }
     });
+
+    // ── Wire up Text Input for Chat ──
+    // Find the text input and send button on the voice page
+    var textInput = document.querySelector('input[type="text"]') || document.querySelector('input[placeholder]');
+    var sendIcon = null;
+    document.querySelectorAll('span.material-symbols-outlined').forEach(function(icon) {
+      var name = (icon.getAttribute('data-icon') || icon.textContent || '').trim();
+      if (name === 'send' || name === 'arrow_upward') {
+        sendIcon = icon.closest('a') || icon.closest('button') || icon;
+      }
+    });
+
+    var isSendingText = false;
+
+    async function sendTextMessage() {
+      if (!textInput || isSendingText) return;
+      var txt = textInput.value.trim();
+      if (!txt) return;
+
+      isSendingText = true;
+      appendMessage(txt, true);
+      textInput.value = '';
+
+      var loadingMsg = appendMessage('⏳ Thinking...', false);
+
+      try {
+        var controller = new AbortController();
+        var timeout = setTimeout(function(){ controller.abort(); }, 60000);
+
+        var res = await fetch('/api/n8n/webhook/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: txt }),
+          signal: controller.signal
+        });
+        clearTimeout(timeout);
+
+        if (loadingMsg) loadingMsg.remove();
+
+        if (!res.ok) throw new Error('Status ' + res.status);
+
+        var raw = await res.text();
+        console.log('[Amrit Chatbot] Raw n8n response:', raw);
+        
+        var data;
+        try { data = JSON.parse(raw); } catch(e) { data = raw; }
+
+        var reply;
+        if (typeof data === 'string') {
+          reply = data;
+        } else if (Array.isArray(data)) {
+          reply = data[0].output || data[0].response || data[0].text || data[0].message || JSON.stringify(data[0]);
+        } else {
+          reply = data.output || data.response || data.text || data.message || JSON.stringify(data);
+        }
+
+        console.log('[Amrit Chatbot] Parsed reply to show:', reply);
+        
+        if (!reply || reply.toString().trim() === '') {
+           reply = '[No text response found in n8n output. Check console.]';
+        }
+
+        appendMessage(reply, false);
+      } catch(err) {
+        if (loadingMsg) loadingMsg.remove();
+        console.error('[Amrit Chatbot] Webhook Error:', err);
+        var emsg = err.name === 'AbortError' ? 'Request timed out.' : err.message;
+        appendMessage('⚠ Error: ' + emsg, false);
+      }
+      isSendingText = false;
+      if (textInput) textInput.focus();
+    }
+
+    if (sendIcon) {
+      sendIcon.addEventListener('click', function(e) {
+        e.preventDefault(); e.stopPropagation();
+        sendTextMessage();
+      });
+    }
+
+    if (textInput) {
+      textInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendTextMessage();
+        }
+      });
+    }
 
   }
 
@@ -846,7 +1176,7 @@ const DASHBOARD_MIC_SCRIPT = `
 
     if (!micBtn) return;
 
-    var webhookUrl = '/api/n8n/webhook-test/voice-agent';
+    var webhookUrl = '/api/n8n/webhook-test/free-voice-agent';
     var isRecording = false;
     var mediaRecorder = null;
     var audioChunks = [];
@@ -902,7 +1232,10 @@ const DASHBOARD_MIC_SCRIPT = `
             var controller = new AbortController();
             var tmout = setTimeout(function(){ controller.abort(); }, 120000);
             
-            var r = await fetch(webhookUrl, { method:'POST', headers:{'Content-Type':'audio/webm'}, body: blob, signal: controller.signal });
+            var formData = new FormData();
+            formData.append('user_audio', blob, 'recording.webm');
+            
+            var r = await fetch(webhookUrl, { method:'POST', body: formData, signal: controller.signal });
             clearTimeout(tmout);
             
             if (!r.ok) throw new Error('Status ' + r.status);
@@ -962,25 +1295,171 @@ const FAB_SCRIPT = `
 <script>
 (function() {
   function injectFAB() {
+    // ── Styles ──
+    var fabStyle = document.createElement('style');
+    fabStyle.textContent = [
+      '@keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }',
+      '@keyframes chatOpen { from { opacity:0; transform: translateY(20px) scale(0.95); } to { opacity:1; transform: translateY(0) scale(1); } }',
+      '@keyframes dotBounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }',
+      '#amrit-chat-popup { display:none; position:fixed; bottom:180px; right:24px; width:360px; max-height:480px; z-index:10000; border-radius:20px; overflow:hidden; box-shadow:0 12px 48px rgba(0,0,0,0.25); animation: chatOpen 0.3s ease-out; font-family: Inter, sans-serif; }',
+      '#amrit-chat-popup.open { display:flex; flex-direction:column; }',
+      '#amrit-chat-header { background:linear-gradient(135deg,#ad350a,#7c1d00); color:white; padding:16px 20px; display:flex; align-items:center; gap:10px; flex-shrink:0; }',
+      '#amrit-chat-messages { flex:1; overflow-y:auto; padding:16px; background:#faf9f7; display:flex; flex-direction:column; gap:10px; min-height:200px; max-height:320px; }',
+      '#amrit-chat-input-wrap { display:flex; padding:12px; background:#fff; border-top:1px solid #eee; gap:8px; flex-shrink:0; }',
+      '#amrit-chat-input { flex:1; border:1px solid #ddd; border-radius:12px; padding:10px 14px; font-size:13px; font-family:Inter,sans-serif; outline:none; transition: border-color 0.2s; }',
+      '#amrit-chat-input:focus { border-color:#ad350a; }',
+      '#amrit-chat-send { width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg,#ad350a,#9b2a00); color:white; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; transition: transform 0.15s; flex-shrink:0; }',
+      '#amrit-chat-send:hover { transform:scale(1.08); }',
+      '#amrit-chat-send:disabled { opacity:0.5; cursor:not-allowed; transform:none; }',
+      '.amrit-msg { padding:10px 14px; border-radius:16px; font-size:13px; line-height:1.5; max-width:85%; word-break:break-word; }',
+      '.amrit-msg.user { align-self:flex-end; background:linear-gradient(135deg,#ad350a,#c44a1a); color:white; border-bottom-right-radius:4px; }',
+      '.amrit-msg.bot { align-self:flex-start; background:white; color:#1e293b; border:1px solid #e2e8f0; border-bottom-left-radius:4px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }',
+      '.amrit-typing-dots { display:flex; gap:4px; padding:10px 14px; align-self:flex-start; }',
+      '.amrit-typing-dots span { width:7px; height:7px; border-radius:50%; background:#ad350a; animation: dotBounce 1.2s ease-in-out infinite; }',
+      '.amrit-typing-dots span:nth-child(2) { animation-delay: 0.15s; }',
+      '.amrit-typing-dots span:nth-child(3) { animation-delay: 0.3s; }'
+    ].join('\\n');
+    document.head.appendChild(fabStyle);
+
+    // ── Chat Popup ──
+    var popup = document.createElement('div');
+    popup.id = 'amrit-chat-popup';
+    popup.innerHTML = '<div id="amrit-chat-header">' +
+      '<span class="material-symbols-outlined" style="font-size:22px;">smart_toy</span>' +
+      '<div><div style="font-weight:700;font-size:14px;">Amrit AI Assistant</div><div style="font-size:10px;opacity:0.8;">Ask about Khazan ecosystems</div></div>' +
+      '<button id="amrit-chat-close" style="margin-left:auto;background:none;border:none;color:white;cursor:pointer;font-size:20px;line-height:1;">✕</button>' +
+    '</div>' +
+    '<div id="amrit-chat-messages"></div>' +
+    '<div id="amrit-chat-input-wrap">' +
+      '<input id="amrit-chat-input" type="text" placeholder="Type your question..." autocomplete="off" />' +
+      '<button id="amrit-chat-send"><span class="material-symbols-outlined" style="font-size:18px;">send</span></button>' +
+    '</div>';
+    document.body.appendChild(popup);
+
+    // ── FAB Button ──
     var fab = document.createElement('div');
     fab.id = 'amrit-global-chat-fab';
     fab.style.cssText = 'position:fixed; bottom: 100px; right: 24px; z-index: 9999; animation: slideIn 0.3s ease-out;';
-    fab.innerHTML = '<button style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#ad350a,#9b2a00);color:white;box-shadow:0 8px 32px rgba(173,53,10,0.4);display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\\'scale(1.05)\\'" onmouseout="this.style.transform=\\'scale(1)\\'" onmousedown="this.style.transform=\\'scale(0.95)\\'">' + 
+    fab.innerHTML = '<button style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#ad350a,#9b2a00);color:white;box-shadow:0 8px 32px rgba(173,53,10,0.4);display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\\'scale(1.05)\\'" onmouseout="this.style.transform=\\'scale(1)\\'" onmousedown="this.style.transform=\\'scale(0.95)\\'">' +
                     '<span class="material-symbols-outlined" style="font-size:28px;">smart_toy</span></button>';
-    
-    if (!document.getElementById('amrit-animations')) {
-      var style = document.createElement('style');
-      style.id = 'amrit-animations';
-      style.innerHTML = '@keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }';
-      document.head.appendChild(style);
+    document.body.appendChild(fab);
+
+    var isOpen = false;
+    var msgDiv = popup.querySelector('#amrit-chat-messages');
+    var input = popup.querySelector('#amrit-chat-input');
+    var sendBtn = popup.querySelector('#amrit-chat-send');
+    var closeBtn = popup.querySelector('#amrit-chat-close');
+
+    // Welcome message
+    addMsg('Hi! I am the **Amrit AI Assistant**. Ask me anything about the Khazan ecosystem, sluice gates, subsidies, or water quality. 🌊', false);
+
+    function addMsg(text, isUser) {
+      var d = document.createElement('div');
+      d.className = 'amrit-msg ' + (isUser ? 'user' : 'bot');
+      // Simple bold markdown
+      var formatted = text.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
+      d.innerHTML = formatted;
+      msgDiv.appendChild(d);
+      msgDiv.scrollTop = msgDiv.scrollHeight;
+      return d;
     }
-    
+
+    function showTyping() {
+      var d = document.createElement('div');
+      d.className = 'amrit-typing-dots';
+      d.id = 'amrit-typing';
+      d.innerHTML = '<span></span><span></span><span></span>';
+      msgDiv.appendChild(d);
+      msgDiv.scrollTop = msgDiv.scrollHeight;
+      return d;
+    }
+
+    function removeTyping() {
+      var t = msgDiv.querySelector('#amrit-typing');
+      if (t) t.remove();
+    }
+
+    async function sendMessage() {
+      var txt = input.value.trim();
+      if (!txt) return;
+
+      addMsg(txt, true);
+      input.value = '';
+      sendBtn.disabled = true;
+      showTyping();
+
+      try {
+        var controller = new AbortController();
+        var timeout = setTimeout(function(){ controller.abort(); }, 60000);
+
+        var res = await fetch('/api/n8n/webhook/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: txt }),
+          signal: controller.signal
+        });
+        clearTimeout(timeout);
+
+        removeTyping();
+
+        if (!res.ok) throw new Error('Status ' + res.status);
+
+        var raw = await res.text();
+        console.log('[FAB Chatbot] Raw n8n response:', raw);
+        var data;
+        try { data = JSON.parse(raw); } catch(e) { data = raw; }
+
+        var reply;
+        if (typeof data === 'string') {
+          reply = data;
+        } else if (Array.isArray(data)) {
+          reply = data[0].output || data[0].response || data[0].text || data[0].message || JSON.stringify(data[0]);
+        } else {
+          reply = data.output || data.response || data.text || data.message || JSON.stringify(data);
+        }
+        
+        console.log('[FAB Chatbot] Parsed reply to show:', reply);
+        if (!reply || reply.toString().trim() === '') {
+           reply = '[No text response found in n8n output. Check console.]';
+        }
+
+        addMsg(reply, false);
+
+      } catch(err) {
+        removeTyping();
+        console.error('[FAB Chatbot] Webhook Error:', err);
+        var emsg = err.name === 'AbortError' ? 'Request timed out.' : err.message;
+        addMsg('⚠ Error: ' + emsg, false);
+      }
+      sendBtn.disabled = false;
+      input.focus();
+    }
+
+    // ── Events ──
     fab.onclick = function(e) {
       e.preventDefault(); e.stopPropagation();
-      window.parent.postMessage({ type: 'amrit-nav', tab: 'voice' }, '*');
+      isOpen = !isOpen;
+      popup.className = isOpen ? 'open' : '';
+      if (isOpen) input.focus();
     };
-    
-    document.body.appendChild(fab);
+
+    closeBtn.onclick = function(e) {
+      e.preventDefault(); e.stopPropagation();
+      isOpen = false;
+      popup.className = '';
+    };
+
+    sendBtn.onclick = function(e) {
+      e.preventDefault(); e.stopPropagation();
+      sendMessage();
+    };
+
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
   }
   if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', injectFAB); } else { injectFAB(); }
 })();
