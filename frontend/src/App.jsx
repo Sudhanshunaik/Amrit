@@ -380,7 +380,11 @@ const VISION_SCAN_SCRIPT = `
       videoEl.style.cssText = 'width:100%;height:100%;object-fit:cover;opacity:0;position:absolute;top:0;left:0;transition:opacity 0.5s;';
       videoEl.muted = true;
       videoEl.playsInline = true;
+      videoEl.autoplay = true;
       videoEl.loop = true;
+      videoEl.setAttribute('autoplay', '');
+      videoEl.setAttribute('playsinline', '');
+      videoEl.setAttribute('muted', '');
       feedContainer.style.position = 'relative';
       feedContainer.appendChild(videoEl);
     }
@@ -605,8 +609,14 @@ const VISION_SCAN_SCRIPT = `
           ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
           base64String = canvas.toDataURL('image/jpeg', 0.85);
           console.log('[Amrit] Frame captured from LIVE camera stream');
-        } else if (isAnomalyActive && videoEl && videoEl.readyState >= 2) {
-          // Capture from anomaly video (same-origin, no CORS issue)
+        } else if (isAnomalyActive && videoEl) {
+          // Await video to load enough data to draw
+          if (videoEl.readyState < 2) {
+              await new Promise(function(resolve) {
+                  videoEl.addEventListener('loadeddata', resolve, { once: true });
+                  setTimeout(resolve, 1500); // safety fallback
+              });
+          }
           canvas.width = videoEl.videoWidth || 640;
           canvas.height = videoEl.videoHeight || 360;
           var ctx2 = canvas.getContext('2d');
@@ -643,7 +653,7 @@ const VISION_SCAN_SCRIPT = `
 
         // POST to n8n
         // If testing in n8n UI, use /webhook-test/, but we default to production /webhook/
-        var response = await fetch('/api/n8n/webhook/vision-frame', {
+        var response = await fetch('/api/n8n/webhook-test/vision-frame', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image: base64String })
@@ -714,7 +724,7 @@ const VISION_SCAN_SCRIPT = `
       try {
           resetToNormal(); // Clear any existing UI anomalies BEFORE trying to start the feed
           
-          var constraints = { video: { facingMode: 'environment' } };
+          var constraints = { video: true };
           
           // Use whatever device is selected in the dropdown if available
           var camSelect = document.getElementById('amrit-cam-select');
@@ -754,7 +764,9 @@ const VISION_SCAN_SCRIPT = `
                       var newStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: camSelect.value } } });
                       streamRef = newStream;
                       if (videoEl) {
+                          videoEl.removeAttribute('src');
                           videoEl.srcObject = newStream;
+                          videoEl.style.opacity = '1';
                           videoEl.play().catch(function(e){ console.error('Play err', e) });
                       }
                   } catch (e) {
@@ -785,39 +797,67 @@ const VISION_SCAN_SCRIPT = `
           showToast('🟢 Live feed active. AI analyzing environment...', false);
 
           liveInterval = setInterval(async function() {
-              if (!isLiveActive || isAnomalyActive) return;
+              // Now we want to keep scanning IF either live feed OR anomaly video is active!
+              if (!isLiveActive && !isAnomalyActive) return;
               try {
+                  // Wait for video data if it just switched to anomaly
+                  if (videoEl && videoEl.readyState < 2) return;
+                  
                   canvas.width = videoEl.videoWidth || 640;
                   canvas.height = videoEl.videoHeight || 360;
                   var ctx = canvas.getContext('2d');
                   ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
                   var base64Str = canvas.toDataURL('image/jpeg', 0.6);
 
-                  var endpoint = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && false ? '/api/n8n/webhook-test/vision-frame' : '/api/n8n/webhook/vision-frame';
-                  
-                  var response = await fetch(endpoint, {
+                  var endpoint = '/api/n8n/webhook-test/vision-frame';
+                  var fetchOpts = {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ image: base64Str })
-                  });
-                  if (!response.ok) return;
-                  var data = await response.json();
-                  var msg = data.message || JSON.stringify(data);
-                  if (msg === 'Workflow was started') return;
+                  };
                   
-                  var rawText = data.text || (data[0] && data[0].text) || (data.data && data.data[0] && data.data[0].text) || msg;
-                  if (typeof rawText === 'string' && rawText.toUpperCase().includes('TRUE')) {
-                      // Trigger lock down
+                  var response = await fetch(endpoint, fetchOpts);
+                  if (response.status === 404) {
+                      endpoint = endpoint.replace('webhook-test', 'webhook');
+                      response = await fetch(endpoint, fetchOpts);
+                  }
+                  
+                  if (!response.ok) { console.warn('[Amrit Vision] Frame check returned', response.status); return; }
+                  var data = await response.json();
+                  
+                  // Skip n8n's immediate "Workflow was started" placeholder
+                  if (data.message === 'Workflow was started') return;
+                  
+                  console.log('[Amrit Vision] Frame analysis result:', data);
+                  
+                  // Detect sabotage from EITHER:
+                  //  1. New structured response: { sabotage: true, status: "ALERT" }
+                  //  2. Legacy raw text response: { text: "TRUE" }
+                  var isSabotage = false;
+                  if (data.sabotage === true || data.status === 'ALERT') {
+                      isSabotage = true;
+                  } else {
+                      var rawText = data.text || (data[0] && data[0].text) || (data.data && data.data[0] && data.data[0].text) || '';
+                      if (typeof rawText === 'string' && rawText.toUpperCase().includes('TRUE')) {
+                          isSabotage = true;
+                      }
+                  }
+                  
+                  if (isSabotage) {
+                      // 🚨 SABOTAGE DETECTED — Trigger full lockdown UI
                       activateAnomaly();
                       clearInterval(liveInterval);
                       isLiveActive = false;
+                      window.amritIsLiveActive = false;
                       liveBtn.innerHTML = originalLiveHTML;
                       liveBtn.style.cssText = 'background:linear-gradient(135deg,#0ea5e9,#0369a1); white-space: nowrap;';
                       if (streamRef) streamRef.getTracks().forEach(function(t) { t.stop() });
-                      showToast('🚨 LIVE FEED DETECTED CRITICAL SABOTAGE!', true);
+                      showToast('🚨 SABOTAGE DETECTED! Sluice gate breach identified by AI!', true);
+                  } else {
+                      console.log('[Amrit Vision] ✅ Gate secure. Next check in 15s...');
                   }
-              } catch(err) { console.error('Live fetch error:', err); }
-          }, 5000); 
+              } catch(err) { console.error('[Amrit Vision] Live fetch error:', err); }
+          }, 15000); 
       } catch(err) {
           showToast('⚠ Camera access denied: Please allow permissions or run on localhost/https.', true);
       }
@@ -857,7 +897,7 @@ const CHATBOT_SCRIPT = `
     ].join('\\n');
     document.head.appendChild(vs);
 
-    var webhookUrl = '/api/n8n/webhook-test/free-voice-agent';
+    var webhookUrl = '/api/n8n/webhook-test/voice-agent';
     
     var banner = document.createElement('div');
     banner.id = 'amrit-webhook-status';
@@ -907,10 +947,12 @@ const CHATBOT_SCRIPT = `
       var url = URL.createObjectURL(blob);
       var d = document.createElement('div');
       d.className = 'self-start max-w-[85%] bg-surface-container p-5 rounded-[24px] rounded-tl-sm text-on-surface shadow-sm';
-      d.innerHTML = '<div class="flex items-center gap-2 mb-2"><span class="material-symbols-outlined text-primary text-sm" data-icon="auto_awesome">auto_awesome</span><span class="font-label text-[10px] uppercase tracking-tighter text-primary font-bold">Amrit Voice Agent</span></div>' +
-        '<audio controls autoplay style="width:100%;border-radius:12px;margin-top:8px;"><source src="' + url + '" type="audio/wav">Your browser does not support audio.</audio>';
+      d.innerHTML = '<div class="flex items-center gap-2 mb-2"><span class="material-symbols-outlined text-primary text-sm" data-icon="auto_awesome">auto_awesome</span><span class="font-label text-[10px] uppercase tracking-tighter text-primary font-bold">Amrit Voice Agent</span></div><p class="font-body text-sm leading-relaxed text-primary">🔊 Playing voice response...</p>';
       historyDiv.appendChild(d);
       historyDiv.scrollTop = historyDiv.scrollHeight;
+      
+      var audio = new Audio(url);
+      audio.play().catch(e => console.error("Autoplay blocked by browser:", e));
     }
 
     var heroSection = document.querySelector('section.flex.flex-col.items-center.justify-center');
@@ -962,11 +1004,17 @@ const CHATBOT_SCRIPT = `
             var formData = new FormData();
             formData.append('user_audio', audioBlob, 'recording.webm');
             
-            var r = await fetch(webhookUrl, {
+            var webhookPath = webhookUrl;
+            var fetchOpts = {
               method: 'POST',
               body: formData,
               signal: controller.signal
-            });
+            };
+            var r = await fetch(webhookPath, fetchOpts);
+            if (r.status === 404 && webhookPath.includes('webhook-test')) {
+                webhookPath = webhookPath.replace('webhook-test', 'webhook');
+                r = await fetch(webhookPath, fetchOpts);
+            }
             clearTimeout(timeout);
             
             if (!r.ok) throw new Error('Webhook returned ' + r.status);
@@ -983,8 +1031,16 @@ const CHATBOT_SCRIPT = `
               var raw = await r.text();
               console.log('[Amrit Voice] Received text response:', raw);
               var data; try { data = JSON.parse(raw); } catch(e) { data = raw; }
-              var reply = typeof data === 'string' ? data : (data.output || data.response || data.message || data.text || JSON.stringify(data));
+              var reply = typeof data === 'string' ? data : ((data.content && data.content.parts && data.content.parts[0] && data.content.parts[0].text) || data.output || data.response || data.message || data.text || JSON.stringify(data));
               appendMessage(reply, false);
+              
+              if ('speechSynthesis' in window) {
+                var utterance = new SpeechSynthesisUtterance(reply.replace(/[*#]/g, ''));
+                var voices = window.speechSynthesis.getVoices();
+                var indVoice = voices.find(v => v.lang.includes('kok') || v.lang.includes('mr-IN') || v.lang.includes('hi-IN') || v.lang.includes('en-IN'));
+                if (indVoice) utterance.voice = indVoice;
+                window.speechSynthesis.speak(utterance);
+              }
             }
             if (!isWorkflowActive) { isWorkflowActive = true; banner.style.display = 'flex'; }
           } catch(err) {
@@ -1061,12 +1117,18 @@ const CHATBOT_SCRIPT = `
         var controller = new AbortController();
         var timeout = setTimeout(function(){ controller.abort(); }, 60000);
 
-        var res = await fetch('/api/n8n/webhook/chat', {
+        var webhookPath = '/api/n8n/webhook-test/chat';
+        var fetchOpts = {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: txt }),
           signal: controller.signal
-        });
+        };
+        var res = await fetch(webhookPath, fetchOpts);
+        if (res.status === 404) {
+            webhookPath = webhookPath.replace('webhook-test', 'webhook');
+            res = await fetch(webhookPath, fetchOpts);
+        }
         clearTimeout(timeout);
 
         if (loadingMsg) loadingMsg.remove();
@@ -1085,7 +1147,7 @@ const CHATBOT_SCRIPT = `
         } else if (Array.isArray(data)) {
           reply = data[0].output || data[0].response || data[0].text || data[0].message || JSON.stringify(data[0]);
         } else {
-          reply = data.output || data.response || data.text || data.message || JSON.stringify(data);
+          reply = (data.content && data.content.parts && data.content.parts[0] && data.content.parts[0].text) || data.output || data.response || data.text || data.message || JSON.stringify(data);
         }
 
         console.log('[Amrit Chatbot] Parsed reply to show:', reply);
@@ -1095,6 +1157,14 @@ const CHATBOT_SCRIPT = `
         }
 
         appendMessage(reply, false);
+        
+              if ('speechSynthesis' in window) {
+                var utterance = new SpeechSynthesisUtterance(reply.replace(/[*#]/g, ''));
+                var voices = window.speechSynthesis.getVoices();
+                var indVoice = voices.find(v => v.lang.includes('kok') || v.lang.includes('mr-IN') || v.lang.includes('hi-IN') || v.lang.includes('en-IN'));
+                if (indVoice) utterance.voice = indVoice;
+                window.speechSynthesis.speak(utterance);
+              }
       } catch(err) {
         if (loadingMsg) loadingMsg.remove();
         console.error('[Amrit Chatbot] Webhook Error:', err);
@@ -1176,7 +1246,7 @@ const DASHBOARD_MIC_SCRIPT = `
 
     if (!micBtn) return;
 
-    var webhookUrl = '/api/n8n/webhook-test/free-voice-agent';
+    var webhookUrl = '/api/n8n/webhook-test/voice-agent';
     var isRecording = false;
     var mediaRecorder = null;
     var audioChunks = [];
@@ -1233,7 +1303,7 @@ const DASHBOARD_MIC_SCRIPT = `
             var tmout = setTimeout(function(){ controller.abort(); }, 120000);
             
             var formData = new FormData();
-            formData.append('user_audio', blob, 'recording.webm');
+            formData.append('audio', blob, 'recording.webm');
             
             var r = await fetch(webhookUrl, { method:'POST', body: formData, signal: controller.signal });
             clearTimeout(tmout);
@@ -1250,8 +1320,16 @@ const DASHBOARD_MIC_SCRIPT = `
             } else {
               var raw = await r.text();
               var data; try{data=JSON.parse(raw);}catch(e){data=raw;}
-              var reply = typeof data==='string' ? data : (data.output||data.response||data.message||data.text||JSON.stringify(data));
+              var reply = typeof data==='string' ? data : ((data.content && data.content.parts && data.content.parts[0] && data.content.parts[0].text) || data.output || data.response || data.message || data.text || JSON.stringify(data));
               showToast('💬 ' + reply.substring(0,100), false);
+              
+              if ('speechSynthesis' in window) {
+                var utterance = new SpeechSynthesisUtterance(reply.replace(/[*#]/g, ''));
+                var voices = window.speechSynthesis.getVoices();
+                var indVoice = voices.find(v => v.lang.includes('kok') || v.lang.includes('mr-IN') || v.lang.includes('hi-IN') || v.lang.includes('en-IN'));
+                if (indVoice) utterance.voice = indVoice;
+                window.speechSynthesis.speak(utterance);
+              }
             }
           } catch(e) {
             var emsg = e.name === 'AbortError' ? 'Timed out (120s)' : e.message;

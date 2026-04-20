@@ -8,10 +8,10 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api/n8n': {
-        target: 'https://sudhanshunaik647.app.n8n.cloud',
+        target: 'http://localhost:5678',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/n8n/, ''),
-        secure: true,
+        secure: false, // Set to false for localhost http
         timeout: 120000,
         proxyTimeout: 120000,
       },

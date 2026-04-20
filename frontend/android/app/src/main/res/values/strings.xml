@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Amrit</string>
+    <string name="title_activity_main">Amrit</string>
+    <string name="package_name">com.sudhanshunaik.amrit</string>
+    <string name="custom_url_scheme">com.sudhanshunaik.amrit</string>
+</resources>
