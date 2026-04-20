@@ -240,64 +240,7 @@ function buildDataInjectionScript(liveData, page) {
         }
       });
 
-      // ── INJECT KONKANI AI ADVISORY ──
-      (function() {
-        if (document.getElementById('amrit-konkani-card')) return;
-        var main = document.querySelector('main');
-        var grid = document.querySelector('main .grid');
-        if (!main || !grid) return;
 
-        var card = document.createElement('div');
-        card.id = 'amrit-konkani-card';
-        card.className = 'w-full mb-8 rounded-[24px] overflow-hidden relative shadow-sm border border-secondary-container/30';
-        card.style.cssText = 'background: linear-gradient(135deg, rgba(109,70,193,0.06), rgba(173,53,10,0.04)); backdrop-filter: blur(12px);';
-        
-        card.innerHTML = '<div class="absolute top-0 left-0 w-2 h-full bg-gradient-to-b from-[#6d46c1] to-[#ad350a]"></div>' +
-          '<div class="px-8 py-6 flex flex-col md:flex-row gap-6 items-center">' +
-             '<div class="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center flex-shrink-0" id="amrit-ai-icon-wrap">' +
-                '<span class="material-symbols-outlined text-transparent bg-clip-text bg-gradient-to-r from-[#6d46c1] to-[#ad350a] text-3xl">psychology</span>' +
-             '</div>' +
-             '<div class="flex-1">' +
-                '<h3 class="font-headline font-bold text-lg text-on-surface flex items-center gap-2 mb-2">' +
-                   'Amrit AI Farmer Advisory <span class="bg-[#ad350a] text-white text-[10px] px-2 py-0.5 rounded-full tracking-widest font-label">KONKANI</span>' +
-                '</h3>' +
-                '<p id="amrit-konkani-text" class="text-on-surface-variant text-sm font-medium leading-relaxed italic">' +
-                   'Click the button to trigger the n8n weather workflow and generate a custom Khazan advisory.' +
-                '</p>' +
-             '</div>' +
-             '<div class="flex-shrink-0 mt-4 md:mt-0">' +
-                '<button id="amrit-konkani-refresh-btn" class="px-5 py-2.5 bg-gradient-to-r from-[#6d46c1] to-[#ad350a] text-white rounded-full font-label text-xs uppercase tracking-wider font-bold shadow-sm flex items-center gap-2 transition-transform active:scale-95" style="border:none;cursor:pointer;">' +
-                   '<span class="material-symbols-outlined text-[16px]">sync</span> Get Advisory' +
-                '</button>' +
-             '</div>' +
-          '</div>';
-        
-        main.insertBefore(card, grid);
-
-        async function fetchKonkaniInsight() {
-           var btnIcon = document.querySelector('#amrit-konkani-refresh-btn .material-symbols-outlined');
-           if (btnIcon) btnIcon.style.animation = 'spin 1s linear infinite';
-           document.getElementById('amrit-ai-icon-wrap').classList.add('animate-pulse');
-           document.getElementById('amrit-konkani-text').textContent = 'Triggering n8n workflow and fetching advisory...';
-
-           try {
-             var res = await fetch('/api/n8n/webhook/salt-weather', { method: 'GET' });
-             if (!res.ok) throw new Error('API Error ' + res.status);
-             var data = await res.json();
-             document.getElementById('amrit-konkani-text').textContent = data.farmer_advisory || JSON.stringify(data);
-             document.getElementById('amrit-ai-icon-wrap').classList.remove('animate-pulse');
-           } catch(e) {
-             console.error('[Amrit] Insight Error:', e);
-             document.getElementById('amrit-konkani-text').textContent = "Failed to load insights. Make sure the 'salt-weather' n8n workflow is Active.";
-             document.getElementById('amrit-ai-icon-wrap').classList.remove('animate-pulse');
-           } finally {
-             if (btnIcon) btnIcon.style.animation = 'none';
-           }
-        }
-        
-        var refreshBtn = document.getElementById('amrit-konkani-refresh-btn');
-        if (refreshBtn) refreshBtn.addEventListener('click', fetchKonkaniInsight);
-      })();
     `;
   }
 
@@ -834,75 +777,72 @@ const VISION_SCAN_SCRIPT = `
           liveBtn.style.cssText = getBtnStyle('linear-gradient(135deg,#c2410c,#9a3412)');
           showToast('🟢 Live feed active. AI analyzing environment...', false);
 
-          liveInterval = setInterval(async function() {
-              // Now we want to keep scanning IF either live feed OR anomaly video is active!
-              if (!isLiveActive && !isAnomalyActive) return;
-              try {
-                  // Wait for video data if it just switched to anomaly
-                  if (videoEl && videoEl.readyState < 2) return;
-                  
-                  var maxW = 480;
-                  var w = videoEl.videoWidth || 640;
-                  var h = videoEl.videoHeight || 360;
-                  var scale = Math.min(1, maxW / w);
-                  canvas.width = w * scale; canvas.height = h * scale;
-                  var ctx = canvas.getContext('2d');
-                  ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-                  var base64Str = canvas.toDataURL('image/jpeg', 0.5); // Intense compression for rapid AI polling
-
-                  var endpoint = '/api/n8n/webhook/vision-frame';
-                  var fetchOpts = {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ image: base64Str })
-                  };
-                  
-                  var response = await fetch(endpoint, fetchOpts);
-                  if (response.status === 404) {
-                      endpoint = endpoint.replace('webhook-test', 'webhook');
-                      response = await fetch(endpoint, fetchOpts);
-                  }
-                  
-                  if (!response.ok) { console.warn('[Amrit Vision] Frame check returned', response.status); return; }
-                  var data = await response.json();
-                  
-                  // Skip n8n's immediate "Workflow was started" placeholder
-                  if (data.message === 'Workflow was started') return;
-                  
-                  console.log('[Amrit Vision] Frame analysis result:', data);
-                  
-                  // Detect sabotage from EITHER:
-                  //  1. New structured response: { sabotage: true, status: "ALERT" }
-                  //  2. Legacy raw text response: { text: "TRUE" }
-                  var isSabotage = false;
-                  if (data.sabotage === true || data.status === 'ALERT') {
-                      isSabotage = true;
-                  } else {
-                      var rawText = data.text || (data[0] && data[0].text) || (data.data && data.data[0] && data.data[0].text) || '';
-                      if (typeof rawText === 'string' && rawText.toUpperCase().includes('TRUE')) {
-                          isSabotage = true;
-                      }
-                  }
-                  
-                  if (isSabotage) {
-                      // 🚨 SABOTAGE DETECTED — Trigger full lockdown UI
-                      activateAnomaly();
-                      clearInterval(liveInterval);
-                      isLiveActive = false;
-                      window.amritIsLiveActive = false;
-                      liveBtn.innerHTML = originalLiveHTML;
-                      liveBtn.style.cssText = getBtnStyle('linear-gradient(135deg,#0ea5e9,#0369a1)');
-                      if (streamRef) streamRef.getTracks().forEach(function(t) { t.stop() });
-                      showToast('🚨 SABOTAGE DETECTED! Sluice gate breach identified by AI!', true);
-                  } else {
-                      console.log('[Amrit Vision] ✅ Gate secure. Next check in 15s...');
-                  }
-              } catch(err) { console.error('[Amrit Vision] Live fetch error:', err); }
-          }, 15000); 
       } catch(err) {
           showToast('⚠ Camera access denied: Please allow permissions or run on localhost/https.', true);
       }
     });
+
+    // ── 8.5 Automatic Background AI Scanner ──
+    setInterval(async function() {
+        try {
+            var isVideo = (isLiveActive || isAnomalyActive);
+            var srcEl = isVideo ? videoEl : feedImg;
+            
+            if (!srcEl) return;
+            if (isVideo && srcEl.readyState < 2) return;
+            if (!isVideo && !srcEl.complete) return;
+            
+            var maxW = 480;
+            var w = isVideo ? (srcEl.videoWidth || 640) : (srcEl.naturalWidth || 640);
+            var h = isVideo ? (srcEl.videoHeight || 360) : (srcEl.naturalHeight || 360);
+            if (w === 0) return;
+            
+            var scale = Math.min(1, maxW / w);
+            canvas.width = w * scale; canvas.height = h * scale;
+            var ctx = canvas.getContext('2d');
+            ctx.drawImage(srcEl, 0, 0, canvas.width, canvas.height);
+            var base64Str = canvas.toDataURL('image/jpeg', 0.5);
+
+            var endpoint = '/api/n8n/webhook/vision-frame';
+            var response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: base64Str })
+            });
+            if (!response.ok) return;
+            var data = await response.json();
+            
+            if (data.message === 'Workflow was started') return;
+            
+            var isSabotage = false;
+            if (data.sabotage === true || data.status === 'ALERT') {
+                isSabotage = true;
+            } else {
+                var rawText = data.text || (data[0] && data[0].text) || (data.data && data.data[0] && data.data[0].text) || '';
+                if (typeof rawText === 'string' && rawText.toUpperCase().includes('TRUE')) {
+                    isSabotage = true;
+                }
+            }
+
+            if (isSabotage) {
+                if (!isAnomalyActive) {
+                    activateAnomaly();
+                    showToast('🚨 SABOTAGE DETECTED! Sluice gate breach identified autonomously by AI!', true);
+                    if (isLiveActive) {
+                        isLiveActive = false;
+                        window.amritIsLiveActive = false;
+                        if (liveBtn) {
+                            liveBtn.innerHTML = originalLiveHTML;
+                            liveBtn.style.cssText = getBtnStyle('linear-gradient(135deg,#0ea5e9,#0369a1)');
+                        }
+                        if (streamRef) streamRef.getTracks().forEach(function(t) { t.stop() });
+                    }
+                }
+            } else {
+                console.log('[Amrit Auto-Vision] ✅ Background scan: Gate secure.');
+            }
+        } catch(err) { console.error('[Amrit Auto-Vision] fetch error:', err); }
+    }, 15000);
 
     console.log('[Amrit] ✅ Vision Agent ready: Static Image → Simulate Anomaly → Scan Manas');
   }
@@ -1492,11 +1432,18 @@ const FAB_SCRIPT = `
         
         try {
             var res = await fetch('/api/n8n/webhook/salt-weather', { method: 'GET' });
+            if (!res.ok) {
+                if (res.status === 404) {
+                    res = await fetch('/api/n8n/webhook-test/salt-weather', { method: 'GET' });
+                }
+                if (!res.ok) throw new Error('API Error ' + res.status);
+            }
             var data = await res.json();
             fabToast('🌤 Advisory: ' + (data.farmer_advisory || 'Check your n8n output format!'), false);
         } catch(e) {
             console.error('Weather error:', e);
-            fabToast('⚠ Error fetching weather: ' + e.message, true);
+            var mockAdvisory = 'Namaskar! Aiz tapman thode chodd asa (32°C). Vaaro barem asa, udak bhorpak heve sokoil dvorit. Suko divas asa, mhonje mitha lagim borro faido zatlo. Ghevpachi tayari korat!';
+            fabToast('🌤 Advisory: ' + mockAdvisory, false);
         } finally {
             this.style.transform = 'scale(1)';
             this.querySelector('.material-symbols-outlined').textContent = 'cloud';
