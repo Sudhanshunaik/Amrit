@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700;800&amp;family=Playfair+Display:ital,wght@0,700;1,700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: {
+                DEFAULT: '#f97316',
+                dark: '#ea580c'
+              },
+              violet: {
+                50: '#f5f3ff',
+                100: '#ede9fe',
+                200: '#ddd6fe',
+                400: '#a78bfa',
+                500: '#8b5cf6',
+                600: '#7c3aed',
+                800: '#5b21b6',
+                900: '#4c1d95',
+                950: '#2e1065',
+              },
+              slate: {
+                50: '#f8fafc',
+                400: '#94a3b8',
+                600: '#475569',
+              }
+            },
+            borderRadius: {
+              "DEFAULT": "0.25rem",
+              "lg": "0.5rem",
+              "xl": "0.75rem",
+              "full": "9999px"
+            },
+            fontFamily: {
+              headline: ["Public Sans", "sans-serif"],
+              body: ["Public Sans", "sans-serif"],
+              label: ["Public Sans", "sans-serif"],
+              serif: ["Playfair Display", "serif"],
+            }
+          },
+        },
+      }
+    </script>
+<style>.azulejo-pattern {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuCh2gCjOOeVvtfw3sDxMPEHxBl4PRW_HN0RosC5_pRPa8FHEtXPQK8TJKU5zB-aviTll8xYXmoH9dXGnwfYIUJdfcYeyunkYPG0DkmqMUvv8PfZbmVkXx92D8qdrYLPjAaaSWOOa9YmJxI18wZAh6R916UKkRvK9xkrPwreVb9guo4pTQx6MtIyew2epJGNjVx4tSwJRsQGd7_r6E4nZ08Te7ThhuGAI2i2FXKjpS2eXOjY9NH7HuSaFEB6IUQ7rPzHAw2fHoeyW9s);
+    opacity: 0.03
+    }
+.glass-card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3)
+    }
+.material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24
+    }</style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-slate-50 font-body text-slate-900 pb-24">
+<!-- TopAppBar -->
+<nav class="fixed top-0 w-full z-50 flex justify-between items-center px-4 h-16 bg-slate-50/90 dark:bg-violet-950/90 backdrop-blur-md shadow-sm border-b border-violet-200 dark:border-violet-800">
+<div class="flex items-center gap-3">
+<button class="p-1 -ml-1 text-slate-600 dark:text-slate-400 hover:bg-violet-50 dark:hover:bg-violet-900/50 transition-transform duration-200 active:scale-95 rounded-full">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-orange-500 transition-transform duration-200 active:scale-95">
+<img alt="Farmer Profile Photo" class="w-full h-full object-cover" data-alt="close-up portrait of an elderly Indian farmer with a kind expression, wearing a traditional white cotton shirt in soft morning light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCxFaFeEkycrpYkHWzSXOjXUjOl6q8jbqq1KPer_5qub9L5k0XcWgr3ESG3w2cPyouiqoX4cGyzWKLOgOokDrwrJ0GWT8PMvUI6pRJhUuPxKNCUdalTevwbEANDS6eIW97QjNipSp5EfILe2UkID9KrhM_YrkxW6NYBzym_newTk6i2HG7RFg2H7bCaVTN2vnlcdW5s9hXKt99OEftRlwmC4W2W9ZSQRnsuAWMdOW9Cgheq0GFSuHyGsMblqFax0VhSPq9AAws1-rs"/>
+</div>
+<span class="text-xl font-bold text-violet-900 dark:text-violet-100 font-serif tracking-tight">Project Amrit</span>
+</div>
+<button class="p-2 text-slate-600 dark:text-slate-400 hover:bg-violet-50 dark:hover:bg-violet-900/50 transition-transform duration-200 active:scale-95 rounded-full">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+</nav>
+<main class="pt-20 px-4 max-w-2xl mx-auto space-y-6">
+<!-- Hero Section -->
+<section class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-900 to-violet-950 p-6 shadow-xl">
+<div class="absolute inset-0 azulejo-pattern pointer-events-none"></div>
+<div class="relative z-10 flex flex-col items-center text-center">
+<div class="w-24 h-24 rounded-full border-4 border-orange-500/30 p-1 mb-4 shadow-2xl">
+<img alt="Dr. Amritrao Dessai" class="w-full h-full object-cover rounded-full" data-alt="professional portrait of an elderly man with gray hair, looking proud and calm, against a background of lush tropical greenery" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC49dfkusuIkDRdVMb7Xe-NSo9N8rRhBbx9esCw2yzXjJoE5lBrE7NFSpNjS7DQYCFTfODBtwukS_0-QEpONBou6Oa60-AVDmw34ft6XYUhF6NUWV6WxCu8ScvBMKpQuzhDAsXawQm2f4VTGaHrcH75FahGZze-r-allR0SYxgkfrO3tyQlh6vkD_TeM4xsqkGkVnBVfGgW92dvP45u9Yml2HeDfMUSIqAapx2H1-lF2fFHpGAtFWabEJmv7mA7KQhjs29rx5qEqyE"/>
+</div>
+<h1 class="text-2xl font-extrabold text-white tracking-tight">Dr. Amritrao Dessai</h1>
+<p class="text-orange-400 font-medium tracking-wide uppercase text-xs mt-1">Lead Estuary Guardian</p>
+<div class="mt-6 flex gap-4 w-full">
+<div class="flex-1 bg-white/10 backdrop-blur-sm rounded-2xl py-3 border border-white/10">
+<p class="text-violet-200 text-[10px] uppercase font-bold tracking-widest">Experience</p>
+<p class="text-white font-bold text-lg">24 Years</p>
+</div>
+<div class="flex-1 bg-white/10 backdrop-blur-sm rounded-2xl py-3 border border-white/10">
+<p class="text-violet-200 text-[10px] uppercase font-bold tracking-widest">Managed</p>
+<p class="text-white font-bold text-lg">12 Ha</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Bento Grid Content -->
+<div class="grid grid-cols-2 gap-4">
+<!-- Farm Identity -->
+<div class="col-span-2 glass-card rounded-3xl p-5 flex items-start justify-between relative overflow-hidden">
+<div class="absolute -right-4 -bottom-4 text-violet-100/50">
+<span class="material-symbols-outlined text-8xl" style="font-variation-settings: 'FILL' 1;">landscape</span>
+</div>
+<div class="relative z-10">
+<h3 class="text-violet-900 font-bold text-sm flex items-center gap-2 mb-3">
+<span class="material-symbols-outlined text-orange-500 text-lg">location_on</span>
+                        Farm Identity
+                    </h3>
+<div class="space-y-1">
+<p class="text-slate-400 text-xs font-bold uppercase">Node ID</p>
+<p class="text-slate-800 font-bold text-lg">ESTUARY_04</p>
+<p class="text-slate-600 font-medium text-sm">Chorao Island, Goa</p>
+</div>
+</div>
+<div class="w-16 h-16 rounded-xl bg-orange-100 flex items-center justify-center overflow-hidden">
+<img alt="Location Map" class="w-full h-full object-cover" data-alt="topographic satellite map view of a lush green island surrounded by blue river water channels" data-location="Chorao Island, Goa" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAbKjwXWUfDGqyNvl31sE4CuhTpbPGBzq_WaRnTEjSADpaCuVHQ9_GVTPeoKEejQnqnE_HneYkJcaquwKGAbQbz971ST8Z5IaJ2TG2-mBJtR0PDUb6NJvm4N6dmNVo32uqrvGpnSVE3z42QSNtWB7Ngn59457YlQyweKTypemZ1loNh0bKDbWE40dxEecZr58w-kzLJAuqGgU44kK7toD-ZGP04lb-fEY12_RbZ9owjGBMOVtSm39wR_o38AzNCsZjll9Fblj5h6yg"/>
+</div>
+</div>
+<!-- Performance Stats -->
+<div class="col-span-1 glass-card rounded-3xl p-5 border-l-4 border-l-orange-500">
+<h3 class="text-violet-900 font-bold text-xs uppercase tracking-wider mb-4">Ecosystem Health</h3>
+<div class="flex items-baseline gap-1">
+<span class="text-3xl font-extrabold text-slate-800">94</span>
+<span class="text-orange-500 font-bold text-xl">%</span>
+</div>
+<div class="w-full bg-slate-100 h-1.5 rounded-full mt-3 overflow-hidden">
+<div class="bg-orange-500 h-full w-[94%]"></div>
+</div>
+<p class="text-[10px] text-slate-500 mt-4 font-bold uppercase tracking-tight">Yield: <span class="text-violet-600">High</span></p>
+</div>
+<!-- Connected Devices Status -->
+<div class="col-span-1 glass-card rounded-3xl p-5 bg-gradient-to-br from-white/80 to-violet-50/80">
+<h3 class="text-violet-900 font-bold text-xs uppercase tracking-wider mb-3">Node Status</h3>
+<div class="space-y-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-400 text-sm">water</span>
+<span class="text-[11px] font-bold text-slate-700">Sluice Gate</span>
+</div>
+<div class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-400 text-sm">sensors</span>
+<span class="text-[11px] font-bold text-slate-700">Soil Nodes</span>
+</div>
+<div class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
+</div>
+<div class="flex items-center justify-between opacity-50">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-400 text-sm">air</span>
+<span class="text-[11px] font-bold text-slate-700">Wind Vane</span>
+</div>
+<div class="w-2 h-2 rounded-full bg-slate-300"></div>
+</div>
+</div>
+</div>
+<!-- Action -->
+<div class="col-span-2">
+<button class="w-full py-4 bg-orange-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 transition-transform active:scale-95">
+<span class="material-symbols-outlined">support_agent</span>
+                    Contact Support
+                </button>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-around items-center h-20 pb-safe px-6 bg-white/95 dark:bg-violet-950/95 backdrop-blur-lg shadow-[0_-2px_10px_rgba(0,0,0,0.05)] border-t border-violet-100 dark:border-violet-800">
+<a class="flex flex-col items-center justify-center text-violet-400 dark:text-violet-500 hover:text-orange-400 dark:hover:text-orange-200 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="grid_view">grid_view</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-violet-400 dark:text-violet-500 hover:text-orange-400 dark:hover:text-orange-200 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="Psychiatry">psychiatry</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Sectors</span>
+</a>
+<a class="flex flex-col items-center justify-center text-violet-400 dark:text-violet-500 hover:text-orange-400 dark:hover:text-orange-200 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="hub">hub</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Node</span>
+</a>
+<a class="flex flex-col items-center justify-center text-orange-600 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 rounded-xl px-3 py-1 scale-110 transition-all cubic-bezier(0.4,0,0.2,1)" href="#">
+<span class="material-symbols-outlined" data-icon="person" style="font-variation-settings: 'FILL' 1;">person</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Profile</span>
+</a>
+</nav>
+</body></html>

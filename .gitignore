@@ -1,0 +1,11 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Node modules (just in case they appear at root)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db

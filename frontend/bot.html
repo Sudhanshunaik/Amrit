@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>My Voice Bot</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+
+        button {
+            padding: 20px 40px;
+            font-size: 20px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 10px;
+        }
+
+        button.recording {
+            background: #dc3545;
+        }
+
+        #status {
+            margin-top: 20px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        #aiText {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #333;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>My AI Voice Bot</h1>
+    <button id="recordButton">🎤 Click to Start Recording</button>
+    <p id="status">Waiting for you to speak...</p>
+    <p id="aiText"></p>
+
+    <script>
+        // --- PASTE YOUR N8N TEST URL HERE ---
+        // Make sure it ends in /free-voice-agent
+        const n8nWebhookUrl = "http://localhost:5678/webhook/amrit-voice-agent";
+
+        let mediaRecorder;
+        let audioChunks = [];
+        const button = document.getElementById("recordButton");
+        const status = document.getElementById("status");
+        const aiText = document.getElementById("aiText");
+
+        button.addEventListener("click", async () => {
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                // STOP RECORDING
+                mediaRecorder.stop();
+                button.textContent = "🎤 Click to Start Recording";
+                button.classList.remove("recording");
+                status.textContent = "Thinking...";
+                aiText.textContent = ""; // Clears the text while waiting
+            } else {
+                // START RECORDING
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.start();
+
+                button.textContent = "🛑 Click to Stop & Send";
+                button.classList.add("recording");
+                status.textContent = "Listening...";
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    // PACKAGE THE AUDIO
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const formData = new FormData();
+                    formData.append("user_audio", audioBlob, "voice.webm");
+
+                    // SEND TO N8N
+                    try {
+                        const response = await fetch(n8nWebhookUrl, {
+                            method: "POST",
+                            body: formData
+                        });
+
+                        // CATCH THE AUDIO FILE (BLOB)
+                        const blob = await response.blob();
+
+                        // CREATE A PLAYER AND PLAY IT OUT LOUD
+                        const audioUrl = window.URL.createObjectURL(blob);
+                        const botVoice = new Audio(audioUrl);
+                        botVoice.play();
+
+                        status.textContent = "Done! Audio is playing.";
+
+                    } catch (error) {
+                        console.error("Oops, something went wrong:", error);
+                        status.textContent = "Error connecting to n8n.";
+                    }
+                };
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Project Amrit: Ecosystem Guardian</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@700;800&amp;family=Manrope:wght@400;500;600&amp;family=Space+Grotesk:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-surface-variant": "#5b5e6e",
+                    "secondary": "#6d46c1",
+                    "secondary-container": "#eaddff",
+                    "outline": "#767a8b",
+                    "on-tertiary": "#fef7ff",
+                    "tertiary-fixed-dim": "#c8b1f0",
+                    "primary-fixed": "#ffad94",
+                    "secondary-dim": "#6138b4",
+                    "on-tertiary-container": "#4b386e",
+                    "error-container": "#f76a80",
+                    "on-error": "#fff7f7",
+                    "on-tertiary-fixed-variant": "#544178",
+                    "inverse-primary": "#fe6f42",
+                    "inverse-surface": "#0c0e15",
+                    "error": "#ac3149",
+                    "on-primary-fixed-variant": "#832200",
+                    "on-primary-fixed": "#4f1100",
+                    "tertiary-fixed": "#d6beff",
+                    "on-secondary": "#fdf7ff",
+                    "surface-container-highest": "#dfe1f5",
+                    "primary-dim": "#9b2a00",
+                    "on-secondary-fixed": "#4c1f9f",
+                    "surface-variant": "#dfe1f5",
+                    "surface-tint": "#ad350a",
+                    "primary": "#ad350a",
+                    "tertiary-dim": "#5c4981",
+                    "inverse-on-surface": "#9b9ca6",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-low": "#f2f3ff",
+                    "surface-container": "#ecedfc",
+                    "on-tertiary-fixed": "#362459",
+                    "background": "#faf8ff",
+                    "surface": "#faf8ff",
+                    "on-secondary-fixed-variant": "#6942bd",
+                    "primary-fixed-dim": "#ff9879",
+                    "primary-container": "#ffad94",
+                    "on-error-container": "#68001f",
+                    "surface-bright": "#faf8ff",
+                    "surface-container-high": "#e5e7f8",
+                    "tertiary": "#69558e",
+                    "on-background": "#2e3240",
+                    "tertiary-container": "#d6beff",
+                    "on-surface": "#2e3240",
+                    "error-dim": "#770326",
+                    "surface-dim": "#d5d9ee",
+                    "on-primary-container": "#731d00",
+                    "on-primary": "#fff7f5",
+                    "secondary-fixed-dim": "#ddccff",
+                    "secondary-fixed": "#eaddff",
+                    "outline-variant": "#aeb1c3",
+                    "on-secondary-container": "#5f36b2"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Epilogue"],
+                    "body": ["Manrope"],
+                    "label": ["Space Grotesk"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .azulejo-mask {
+            mask-image: url("https://www.transparenttextures.com/patterns/azulejo.png");
+            mask-size: 200px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body selection:bg-primary-container">
+<!-- Top Bar (Shared Component: TopAppBar) -->
+<header class="fixed top-0 w-full z-50 bg-slate-50/70 backdrop-blur-xl shadow-[0_20px_40px_rgba(46,50,64,0.06)] flex justify-between items-center px-6 h-16 w-full max-w-none">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-orange-700" data-icon="waves">waves</span>
+<h1 class="text-xl font-bold tracking-tight text-violet-900 font-headline">Project Amrit: Ecosystem Guardian</h1>
+</div>
+<div class="flex items-center gap-4">
+<div class="hidden md:flex gap-6 mr-6">
+<span class="font-label text-sm font-bold text-orange-600">Dashboard</span>
+<span class="font-label text-sm text-violet-700/60 hover:text-violet-900 transition-all cursor-pointer">Vision</span>
+<span class="font-label text-sm text-violet-700/60 hover:text-violet-900 transition-all cursor-pointer">Data</span>
+<span class="font-label text-sm text-violet-700/60 hover:text-violet-900 transition-all cursor-pointer">Voice</span>
+</div>
+<div class="bg-surface-container-high px-4 py-1.5 rounded-full text-xs font-label text-secondary font-medium">
+                24°C • High Tide
+            </div>
+</div>
+</header>
+<main class="pt-24 pb-28 px-4 md:px-8 max-w-7xl mx-auto">
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+<!-- Hero Card: Vision Agent (Bento Span 8) -->
+<section class="md:col-span-8 group relative overflow-hidden rounded-xl bg-surface-container-low shadow-sm">
+<!-- Azulejo Pattern Overlay -->
+<div class="absolute inset-0 azulejo-mask opacity-[0.03] pointer-events-none"></div>
+<div class="p-6 pb-0">
+<div class="flex justify-between items-center mb-4">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<h2 class="font-label text-xs uppercase tracking-widest text-secondary font-bold">Vision Agent • Live Feed</h2>
+</div>
+<span class="font-label text-[10px] text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded">STREAM_ID: ESTUARY_04</span>
+</div>
+</div>
+<div class="relative mx-6 mb-6 aspect-video rounded-lg overflow-hidden bg-black">
+<img alt="CCTV feed of river sluice gate" class="w-full h-full object-cover opacity-80" data-alt="Cinematic wide shot of a concrete river sluice gate at misty dawn with soft orange sunlight reflecting off the calm water" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAGtpLo6F0UF_rUV5WehG8Ydv1-qj36Jb1KNJjH-LdM_BEwvlilSevJc4bk2EZ3EnTaiYNYxV1i5HKwvLsjskAij2aJMD987OrImPs_ZEU1uTP1HfJg9QBtkF1y1oHhHQla6OpoNHNGfRKwt62rOe4_rOVnww9UBvB1EsZD0n-Tosp4XmHhSqsfQIowozfg6CyG4cieRNXzTZ0rqAHIK6tFBoKKTdvhbAlbTCy_dMDMNR2TJwc1BN-Ih154qj6n32dkGadZJ8JoYn8"/>
+<!-- Scanline effect -->
+<div class="absolute inset-0 pointer-events-none bg-gradient-to-b from-transparent via-white/5 to-transparent h-20 w-full -translate-y-full animate-[scan_4s_linear_infinite]"></div>
+</div>
+<div class="px-6 pb-6 flex justify-between items-end">
+<div>
+<h3 class="font-headline text-2xl text-on-surface leading-tight">North Creek Entry</h3>
+<p class="text-on-surface-variant font-body text-sm mt-1">Anomaly detected near mechanical actuator. Emergency protocols staged.</p>
+</div>
+</div>
+</section>
+<!-- Data Agent Card (Bento Span 4) -->
+<section class="md:col-span-4 rounded-xl bg-surface-container shadow-sm p-6 relative overflow-hidden">
+<div class="absolute inset-0 azulejo-mask opacity-[0.04] pointer-events-none"></div>
+<div class="relative z-10">
+<div class="flex justify-between items-start mb-8">
+<div>
+<h2 class="font-label text-xs uppercase tracking-widest text-secondary font-bold mb-1">Data Agent</h2>
+<p class="font-headline text-xl">Brine Analytics</p>
+</div>
+<span class="bg-primary-container text-on-primary-container font-label text-[10px] font-bold px-2 py-1 rounded">Phase: Preparatory</span>
+</div>
+<div class="space-y-6">
+<!-- Chart Placeholder Visual -->
+<div class="h-48 w-full flex items-end gap-1">
+<div class="flex-1 bg-secondary/20 rounded-t-sm h-[40%] relative">
+<div class="absolute -top-1 left-0 w-full h-[2px] bg-secondary"></div>
+</div>
+<div class="flex-1 bg-secondary/20 rounded-t-sm h-[55%] relative">
+<div class="absolute -top-1 left-0 w-full h-[2px] bg-secondary"></div>
+</div>
+<div class="flex-1 bg-secondary/20 rounded-t-sm h-[45%] relative">
+<div class="absolute -top-1 left-0 w-full h-[2px] bg-secondary"></div>
+</div>
+<div class="flex-1 bg-primary/20 rounded-t-sm h-[70%] relative">
+<div class="absolute -top-1 left-0 w-full h-[2px] bg-primary"></div>
+</div>
+<div class="flex-1 bg-primary/20 rounded-t-sm h-[85%] relative">
+<div class="absolute -top-1 left-0 w-full h-[2px] bg-primary"></div>
+</div>
+<div class="flex-1 bg-primary/20 rounded-t-sm h-[75%] relative">
+<div class="absolute -top-1 left-0 w-full h-[2px] bg-primary"></div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container-low p-3 rounded-lg">
+<span class="block text-[10px] font-label text-secondary uppercase mb-1">Evaporation</span>
+<span class="font-headline text-lg">14.2<span class="text-xs font-body ml-1">mm/h</span></span>
+</div>
+<div class="bg-surface-container-low p-3 rounded-lg">
+<span class="block text-[10px] font-label text-primary uppercase mb-1">Humidity</span>
+<span class="font-headline text-lg">88<span class="text-xs font-body ml-1">%</span></span>
+</div>
+</div>
+<p class="text-xs font-body text-on-surface-variant leading-relaxed italic">
+                            "Optimal conditions for salt harvesting expected within 48 hours. Monitoring estuary salinity levels."
+                        </p>
+</div>
+</div>
+</section>
+<!-- Voice Agent (Bento Span 12 - Wide) -->
+<section class="md:col-span-12 rounded-xl bg-surface-container-lowest shadow-[0_20px_40px_rgba(46,50,64,0.06)] p-8 relative overflow-hidden border border-outline-variant/10">
+<div class="absolute inset-0 azulejo-mask opacity-[0.02] pointer-events-none"></div>
+<div class="flex flex-col md:flex-row items-center justify-between gap-8">
+<div class="flex-1 text-center md:text-left">
+<h2 class="font-label text-xs uppercase tracking-widest text-secondary font-bold mb-2">Voice Agent</h2>
+<h3 class="font-headline text-3xl text-violet-900 mb-3">Amrit Kaal Subsidy Navigator</h3>
+<p class="font-body text-on-surface-variant max-w-lg">Get real-time assistance with ecosystem grants and local policy updates. Our AI understands regional dialects.</p>
+</div>
+<div class="flex flex-col items-center gap-4">
+<!-- Pulsing Audio Wave Visual -->
+<div class="flex items-center gap-1.5 h-12">
+<div class="w-1.5 h-4 bg-secondary-dim rounded-full animate-pulse"></div>
+<div class="w-1.5 h-8 bg-secondary-dim rounded-full animate-[pulse_1.2s_infinite]"></div>
+<div class="w-1.5 h-12 bg-secondary rounded-full animate-pulse"></div>
+<div class="w-1.5 h-6 bg-secondary-dim rounded-full animate-[pulse_1.5s_infinite]"></div>
+<div class="w-1.5 h-10 bg-secondary rounded-full animate-pulse"></div>
+</div>
+<button class="group flex items-center gap-4 bg-surface-container-high hover:bg-surface-container-highest transition-all px-8 py-4 rounded-full">
+<div class="w-12 h-12 bg-secondary flex items-center justify-center rounded-full text-white shadow-lg group-active:scale-90 transition-transform">
+<span class="material-symbols-outlined" data-icon="mic" style="font-variation-settings: 'FILL' 1;">mic</span>
+</div>
+<div class="text-left">
+<span class="block font-label text-[10px] font-bold text-secondary uppercase">Listening...</span>
+<span class="block font-body text-sm font-semibold">Tap to speak in Konkani or Marathi.</span>
+</div>
+</button>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- Bottom Navigation Bar (Shared Component: BottomNavBar) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center h-20 px-4 pb-safe bg-white/80 backdrop-blur-2xl z-50 rounded-t-3xl shadow-[0_-10px_30px_rgba(109,70,193,0.05)]">
+<a class="flex flex-col items-center justify-center text-orange-600 bg-orange-50 rounded-xl px-4 py-1" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label font-medium text-[11px] uppercase tracking-wider mt-1">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-violet-800/50 px-4 py-1 hover:text-violet-900 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="visibility">visibility</span>
+<span class="font-label font-medium text-[11px] uppercase tracking-wider mt-1">Vision</span>
+</a>
+<a class="flex flex-col items-center justify-center text-violet-800/50 px-4 py-1 hover:text-violet-900 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-label font-medium text-[11px] uppercase tracking-wider mt-1">Data</span>
+</a>
+<a class="flex flex-col items-center justify-center text-violet-800/50 px-4 py-1 hover:text-violet-900 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="mic">mic</span>
+<span class="font-label font-medium text-[11px] uppercase tracking-wider mt-1">Voice</span>
+</a>
+</nav>
+<!-- Desktop Navigation Anchors (Integrated with Body for Web View) -->
+<div class="hidden md:block fixed bottom-8 right-8 z-40">
+<button class="bg-primary text-white p-4 rounded-full shadow-2xl hover:bg-primary-dim transition-all active:scale-95 flex items-center gap-2">
+<span class="material-symbols-outlined" data-icon="support_agent">support_agent</span>
+<span class="font-label text-sm font-bold pr-2">Ecosystem Concierge</span>
+</button>
+</div>
+</body></html>
