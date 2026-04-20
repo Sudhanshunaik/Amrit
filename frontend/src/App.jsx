@@ -413,7 +413,7 @@ const VISION_SCAN_SCRIPT = `
       '⚠ ANOMALY DETECTED — SABOTAGE IN PROGRESS</span>';
     if (feedContainer) feedContainer.appendChild(anomalyOverlay);
 
-    // ── 5. Find DISPATCH WARDEN button ──
+    // ── 5. Find DISPATCH WARDEN button OR fallback container ──
     var buttons = document.querySelectorAll('button');
     var dispatchBtn = null;
     buttons.forEach(function(btn) {
@@ -421,23 +421,56 @@ const VISION_SCAN_SCRIPT = `
         dispatchBtn = btn;
       }
     });
-    if (!dispatchBtn) {
-      console.warn('[Amrit] Could not find DISPATCH WARDEN button.');
+
+    var btnContainer = null;
+    var buttonClass = '';
+
+    if (dispatchBtn) {
+      btnContainer = dispatchBtn.parentNode;
+      buttonClass = dispatchBtn.className;
+    } else {
+      // Fallback for Dashboard tab
+      var h3s = document.querySelectorAll('h3');
+      var northCreek = null;
+      h3s.forEach(function(h) {
+          if (h.textContent.indexOf('North Creek Entry') !== -1) northCreek = h;
+      });
+      if (northCreek && northCreek.parentNode && northCreek.parentNode.parentNode) {
+          btnContainer = northCreek.parentNode.parentNode;
+      } else if (feedContainer && feedContainer.nextElementSibling) {
+          btnContainer = feedContainer.nextElementSibling;
+      }
+      buttonClass = 'px-4 py-2 rounded-full font-label text-xs font-bold uppercase transition-transform active:scale-95 shadow-sm text-white flex items-center justify-center';
+    }
+
+    if (!btnContainer) {
+      console.warn('[Amrit] Could not find container for vision buttons.');
       return;
     }
-    var btnContainer = dispatchBtn.parentNode;
 
     // ── 5.5 Wrap buttons in a flex container to prevent layout squishing ──
     var buttonGroup = document.createElement('div');
-    buttonGroup.style.cssText = 'display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0;';
-    btnContainer.insertBefore(buttonGroup, dispatchBtn);
-    buttonGroup.appendChild(dispatchBtn); // Moves dispatchBtn inside
+    buttonGroup.style.cssText = 'display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; align-items: center;';
+    
+    if (dispatchBtn) {
+      btnContainer.insertBefore(buttonGroup, dispatchBtn);
+      buttonGroup.appendChild(dispatchBtn); // Moves dispatchBtn inside
+    } else {
+      btnContainer.appendChild(buttonGroup);
+    }
+
+    // Helper for base button styles
+    var getBtnStyle = function(bg) {
+        var base = 'white-space: nowrap; display: flex; align-items: center; justify-content: center;';
+        if (!dispatchBtn) base += ' padding: 8px 16px; border-radius: 9999px; color: white; font-family: Space Grotesk, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; border: none; cursor: pointer;';
+        return base + ' background: ' + bg + ';';
+    };
 
     // ── 6. "SIMULATE ANOMALY" / "RESET FEED" button ──
     var anomalyBtn = document.createElement('button');
     anomalyBtn.id = 'amrit-anomaly-btn';
-    anomalyBtn.className = dispatchBtn.className;
-    anomalyBtn.style.cssText = 'background:linear-gradient(135deg,#ac3149,#770326); white-space: nowrap;';
+    anomalyBtn.className = buttonClass;
+    anomalyBtn.style.cssText = getBtnStyle('linear-gradient(135deg,#ac3149,#770326)');
     anomalyBtn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:4px;">' +
       '<span class="material-symbols-outlined" style="font-size:16px;" data-icon="warning">warning</span>' +
       'SIMULATE ANOMALY</span>';
@@ -446,8 +479,8 @@ const VISION_SCAN_SCRIPT = `
     // ── 7. "SCAN MANAS" button ──
     var scanBtn = document.createElement('button');
     scanBtn.id = 'amrit-scan-manas-btn';
-    scanBtn.className = dispatchBtn.className;
-    scanBtn.style.cssText = 'background:linear-gradient(135deg,#6d46c1,#6138b4); white-space: nowrap;';
+    scanBtn.className = buttonClass;
+    scanBtn.style.cssText = getBtnStyle('linear-gradient(135deg,#6d46c1,#6138b4)');
     scanBtn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:4px;">' +
       '<span class="material-symbols-outlined" style="font-size:16px;" data-icon="frame_inspect">frame_inspect</span>' +
       'SCAN MANAS</span>';
@@ -456,8 +489,8 @@ const VISION_SCAN_SCRIPT = `
     // ── 7.5 "LIVE FEED" button ──
     var liveBtn = document.createElement('button');
     liveBtn.id = 'amrit-live-manas-btn';
-    liveBtn.className = dispatchBtn.className;
-    liveBtn.style.cssText = 'background:linear-gradient(135deg,#0ea5e9,#0369a1); white-space: nowrap;';
+    liveBtn.className = buttonClass;
+    liveBtn.style.cssText = getBtnStyle('linear-gradient(135deg,#0ea5e9,#0369a1)');
     liveBtn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:4px;">' +
       '<span class="material-symbols-outlined" style="font-size:16px;" data-icon="videocam">videocam</span>' +
       'LIVE FEED</span>';
@@ -503,7 +536,7 @@ const VISION_SCAN_SCRIPT = `
       });
 
       // Button → RESET FEED
-      anomalyBtn.style.cssText = 'background:linear-gradient(135deg,#16a34a,#15803d);margin-left:8px;';
+      anomalyBtn.style.cssText = getBtnStyle('linear-gradient(135deg,#16a34a,#15803d)') + ' margin-left:8px;';
       anomalyBtn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:4px;">' +
         '<span class="material-symbols-outlined" style="font-size:16px;" data-icon="refresh">refresh</span>' +
         'RESET FEED</span>';
@@ -548,7 +581,7 @@ const VISION_SCAN_SCRIPT = `
       });
 
       // Button → SIMULATE ANOMALY
-      anomalyBtn.style.cssText = 'background:linear-gradient(135deg,#ac3149,#770326);margin-left:8px;';
+      anomalyBtn.style.cssText = getBtnStyle('linear-gradient(135deg,#ac3149,#770326)') + ' margin-left:8px;';
       anomalyBtn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:4px;">' +
         '<span class="material-symbols-outlined" style="font-size:16px;" data-icon="warning">warning</span>' +
         'SIMULATE ANOMALY</span>';
@@ -601,14 +634,21 @@ const VISION_SCAN_SCRIPT = `
       try {
         var base64String;
 
+        // Helper to dramatically compress image payload for faster AI analysis
+        var renderScaled = function(srcElement, w, h) {
+             var maxW = 480;
+             var scale = Math.min(1, maxW / w);
+             canvas.width = w * scale || 480;
+             canvas.height = h * scale || 270;
+             var ctx = canvas.getContext('2d');
+             ctx.drawImage(srcElement, 0, 0, canvas.width, canvas.height);
+             return canvas.toDataURL('image/jpeg', 0.5); // Intense compression to speed up Gemini
+        };
+
         if ((isLiveActive || isAnomalyActive) && videoEl && videoEl.srcObject && videoEl.readyState >= 2) {
           // Capture from live camera stream (DroidCam or webcam)
-          canvas.width = videoEl.videoWidth || 640;
-          canvas.height = videoEl.videoHeight || 360;
-          var ctx = canvas.getContext('2d');
-          ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-          base64String = canvas.toDataURL('image/jpeg', 0.85);
-          console.log('[Amrit] Frame captured from LIVE camera stream');
+          base64String = renderScaled(videoEl, videoEl.videoWidth, videoEl.videoHeight);
+          console.log('[Amrit] Compressed frame captured from LIVE camera stream');
         } else if (isAnomalyActive && videoEl) {
           // Await video to load enough data to draw
           if (videoEl.readyState < 2) {
@@ -617,12 +657,8 @@ const VISION_SCAN_SCRIPT = `
                   setTimeout(resolve, 1500); // safety fallback
               });
           }
-          canvas.width = videoEl.videoWidth || 640;
-          canvas.height = videoEl.videoHeight || 360;
-          var ctx2 = canvas.getContext('2d');
-          ctx2.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-          base64String = canvas.toDataURL('image/jpeg', 0.85);
-          console.log('[Amrit] Frame captured from anomaly video');
+          base64String = renderScaled(videoEl, videoEl.videoWidth, videoEl.videoHeight);
+          console.log('[Amrit] Compressed frame captured from anomaly video');
         } else if (feedImg) {
           // Capture from static image via fetch-blob
           var imgSrc = feedImg.src;
@@ -638,9 +674,13 @@ const VISION_SCAN_SCRIPT = `
               .catch(function() {
                 var img = new Image(); img.crossOrigin = 'anonymous';
                 img.onload = function() {
-                  canvas.width = img.naturalWidth || 640; canvas.height = img.naturalHeight || 360;
+                  var maxW = 480;
+                  var w = img.naturalWidth || 640;
+                  var h = img.naturalHeight || 360;
+                  var scale = Math.min(1, maxW / w);
+                  canvas.width = w * scale; canvas.height = h * scale;
                   var c = canvas.getContext('2d'); c.drawImage(img,0,0,canvas.width,canvas.height);
-                  try { resolve(canvas.toDataURL('image/jpeg',0.85)); } catch(e) { reject(e); }
+                  try { resolve(canvas.toDataURL('image/jpeg',0.5)); } catch(e) { reject(e); }
                 };
                 img.onerror = function() { reject(new Error('Image load failed')); };
                 img.src = imgSrc + (imgSrc.indexOf('?')===-1?'?':'&') + '_t=' + Date.now();
@@ -713,7 +753,7 @@ const VISION_SCAN_SCRIPT = `
           clearInterval(liveInterval);
           if (streamRef) streamRef.getTracks().forEach(function(t) { t.stop() });
           liveBtn.innerHTML = originalLiveHTML;
-          liveBtn.style.cssText = 'background:linear-gradient(135deg,#0ea5e9,#0369a1); white-space: nowrap;';
+          liveBtn.style.cssText = getBtnStyle('linear-gradient(135deg,#0ea5e9,#0369a1)');
           if (videoEl) { videoEl.pause(); videoEl.srcObject = null; videoEl.removeAttribute('src'); videoEl.style.opacity = '0'; }
           if (feedImg) feedImg.style.opacity = '0.8';
           showToast('⏸ Live Monitoring Stopped.', false);
@@ -793,7 +833,7 @@ const VISION_SCAN_SCRIPT = `
           liveBtn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:6px;">' +
             '<span class="amrit-anomaly-dot" style="background:#fff;"></span>' +
             'MONITORING...</span>';
-          liveBtn.style.cssText = 'background:linear-gradient(135deg,#c2410c,#9a3412); white-space: nowrap;';
+          liveBtn.style.cssText = getBtnStyle('linear-gradient(135deg,#c2410c,#9a3412)');
           showToast('🟢 Live feed active. AI analyzing environment...', false);
 
           liveInterval = setInterval(async function() {
@@ -803,11 +843,14 @@ const VISION_SCAN_SCRIPT = `
                   // Wait for video data if it just switched to anomaly
                   if (videoEl && videoEl.readyState < 2) return;
                   
-                  canvas.width = videoEl.videoWidth || 640;
-                  canvas.height = videoEl.videoHeight || 360;
+                  var maxW = 480;
+                  var w = videoEl.videoWidth || 640;
+                  var h = videoEl.videoHeight || 360;
+                  var scale = Math.min(1, maxW / w);
+                  canvas.width = w * scale; canvas.height = h * scale;
                   var ctx = canvas.getContext('2d');
                   ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-                  var base64Str = canvas.toDataURL('image/jpeg', 0.6);
+                  var base64Str = canvas.toDataURL('image/jpeg', 0.5); // Intense compression for rapid AI polling
 
                   var endpoint = '/api/n8n/webhook-test/vision-frame';
                   var fetchOpts = {
@@ -850,7 +893,7 @@ const VISION_SCAN_SCRIPT = `
                       isLiveActive = false;
                       window.amritIsLiveActive = false;
                       liveBtn.innerHTML = originalLiveHTML;
-                      liveBtn.style.cssText = 'background:linear-gradient(135deg,#0ea5e9,#0369a1); white-space: nowrap;';
+                      liveBtn.style.cssText = getBtnStyle('linear-gradient(135deg,#0ea5e9,#0369a1)');
                       if (streamRef) streamRef.getTracks().forEach(function(t) { t.stop() });
                       showToast('🚨 SABOTAGE DETECTED! Sluice gate breach identified by AI!', true);
                   } else {
