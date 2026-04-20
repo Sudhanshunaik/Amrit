@@ -254,7 +254,7 @@ function buildDataInjectionScript(liveData, page) {
         
         card.innerHTML = '<div class="absolute top-0 left-0 w-2 h-full bg-gradient-to-b from-[#6d46c1] to-[#ad350a]"></div>' +
           '<div class="px-8 py-6 flex flex-col md:flex-row gap-6 items-center">' +
-             '<div class="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center flex-shrink-0 animate-pulse" id="amrit-ai-icon-wrap">' +
+             '<div class="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center flex-shrink-0" id="amrit-ai-icon-wrap">' +
                 '<span class="material-symbols-outlined text-transparent bg-clip-text bg-gradient-to-r from-[#6d46c1] to-[#ad350a] text-3xl">psychology</span>' +
              '</div>' +
              '<div class="flex-1">' +
@@ -262,42 +262,41 @@ function buildDataInjectionScript(liveData, page) {
                    'Amrit AI Farmer Advisory <span class="bg-[#ad350a] text-white text-[10px] px-2 py-0.5 rounded-full tracking-widest font-label">KONKANI</span>' +
                 '</h3>' +
                 '<p id="amrit-konkani-text" class="text-on-surface-variant text-sm font-medium leading-relaxed italic">' +
-                   'Generating daily khazan insights natively in Konkani based on current weather patterns...' +
+                   'Click the button to trigger the n8n weather workflow and generate a custom Khazan advisory.' +
                 '</p>' +
+             '</div>' +
+             '<div class="flex-shrink-0 mt-4 md:mt-0">' +
+                '<button id="amrit-konkani-refresh-btn" class="px-5 py-2.5 bg-gradient-to-r from-[#6d46c1] to-[#ad350a] text-white rounded-full font-label text-xs uppercase tracking-wider font-bold shadow-sm flex items-center gap-2 transition-transform active:scale-95" style="border:none;cursor:pointer;">' +
+                   '<span class="material-symbols-outlined text-[16px]">sync</span> Get Advisory' +
+                '</button>' +
              '</div>' +
           '</div>';
         
         main.insertBefore(card, grid);
 
         async function fetchKonkaniInsight() {
+           var btnIcon = document.querySelector('#amrit-konkani-refresh-btn .material-symbols-outlined');
+           if (btnIcon) btnIcon.style.animation = 'spin 1s linear infinite';
+           document.getElementById('amrit-ai-icon-wrap').classList.add('animate-pulse');
+           document.getElementById('amrit-konkani-text').textContent = 'Triggering n8n workflow and fetching advisory...';
+
            try {
-             var prompt = "You are Amrit AI, an agricultural assistant for salt farmers in Goa. " +
-               "Here is the database farm data: Temp: ${weather?.temperature}C, Humidity: ${weather?.humidity}%, Wind: ${weather?.wind_speed}km/h, Tide: ${weather?.tide_status}. " +
-               "Provide important insights about this weather and how it affects their khazan salt farming today. " +
-               "If the numerical data looks like dummy/0 values, give them general tips and tricks for traditional Goan salt farming instead. " +
-               "CRITICAL: Write the ENTIRE reply EXCLUSIVELY in Konkani (using Latin/Romi script). Keep it practical, encouraging, and maximum 3 sentences. No markdown.";
-             
-             var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyClOv8wEnW8ABedh5olbG07E4aGhSWAyqY', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  contents: [{ parts: [{ text: prompt }] }],
-                  generationConfig: { temperature: 0.7, maxOutputTokens: 150 }
-                })
-             });
-             if (!res.ok) throw new Error('API Error');
+             var res = await fetch('/api/n8n/webhook/salt-weather', { method: 'GET' });
+             if (!res.ok) throw new Error('API Error ' + res.status);
              var data = await res.json();
-             var text = data.candidates[0].content.parts[0].text;
-             
-             document.getElementById('amrit-konkani-text').textContent = text;
+             document.getElementById('amrit-konkani-text').textContent = data.farmer_advisory || JSON.stringify(data);
              document.getElementById('amrit-ai-icon-wrap').classList.remove('animate-pulse');
            } catch(e) {
-             console.error('[Amrit] Konkani AI Error:', e);
-             document.getElementById('amrit-konkani-text').textContent = "Somzonni divnk okhant zalam. Internet connection check korat. (Failed to load insights)";
+             console.error('[Amrit] Insight Error:', e);
+             document.getElementById('amrit-konkani-text').textContent = "Failed to load insights. Make sure the 'salt-weather' n8n workflow is Active.";
              document.getElementById('amrit-ai-icon-wrap').classList.remove('animate-pulse');
+           } finally {
+             if (btnIcon) btnIcon.style.animation = 'none';
            }
         }
-        fetchKonkaniInsight();
+        
+        var refreshBtn = document.getElementById('amrit-konkani-refresh-btn');
+        if (refreshBtn) refreshBtn.addEventListener('click', fetchKonkaniInsight);
       })();
     `;
   }
@@ -692,8 +691,7 @@ const VISION_SCAN_SCRIPT = `
         }
 
         // POST to n8n
-        // If testing in n8n UI, use /webhook-test/, but we default to production /webhook/
-        var response = await fetch('/api/n8n/webhook-test/vision-frame', {
+        var response = await fetch('/api/n8n/webhook/vision-frame', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image: base64String })
@@ -852,7 +850,7 @@ const VISION_SCAN_SCRIPT = `
                   ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
                   var base64Str = canvas.toDataURL('image/jpeg', 0.5); // Intense compression for rapid AI polling
 
-                  var endpoint = '/api/n8n/webhook-test/vision-frame';
+                  var endpoint = '/api/n8n/webhook/vision-frame';
                   var fetchOpts = {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
@@ -940,7 +938,7 @@ const CHATBOT_SCRIPT = `
     ].join('\\n');
     document.head.appendChild(vs);
 
-    var webhookUrl = '/api/n8n/webhook-test/voice-agent';
+    var webhookUrl = '/api/n8n/webhook/voice-agent';
     
     var banner = document.createElement('div');
     banner.id = 'amrit-webhook-status';
@@ -1160,7 +1158,7 @@ const CHATBOT_SCRIPT = `
         var controller = new AbortController();
         var timeout = setTimeout(function(){ controller.abort(); }, 60000);
 
-        var webhookPath = '/api/n8n/webhook-test/chat';
+        var webhookPath = '/api/n8n/webhook/chat';
         var fetchOpts = {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1289,7 +1287,7 @@ const DASHBOARD_MIC_SCRIPT = `
 
     if (!micBtn) return;
 
-    var webhookUrl = '/api/n8n/webhook-test/voice-agent';
+    var webhookUrl = '/api/n8n/webhook/voice-agent';
     var isRecording = false;
     var mediaRecorder = null;
     var audioChunks = [];
@@ -1457,11 +1455,60 @@ const FAB_SCRIPT = `
     '</div>';
     document.body.appendChild(popup);
 
-    // ── FAB Button ──
+    // ── Weather FAB Button ──
+    function fabToast(message, isError) {
+      var existing = document.getElementById('amrit-fab-toast');
+      if (existing) existing.remove();
+      var toast = document.createElement('div');
+      toast.id = 'amrit-fab-toast';
+      toast.style.cssText = 'position:fixed;top:80px;right:16px;z-index:9999;' +
+        'max-width:380px;padding:16px 20px;border-radius:12px;font-family:Space Grotesk,sans-serif;' +
+        'font-size:13px;color:#fff;box-shadow:0 8px 32px rgba(0,0,0,0.25);' +
+        'backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);' +
+        'animation:slideIn 0.3s ease-out;word-break:break-word;' +
+        'background:' + (isError ? 'rgba(172,49,73,0.95)' : 'rgba(14,165,233,0.95)') + ';';
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      setTimeout(function() {
+        toast.style.transition = 'opacity 0.5s, transform 0.5s';
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(function() { toast.remove(); }, 500);
+      }, 10000); // 10s to read weather
+    }
+
+    var weatherFab = document.createElement('div');
+    weatherFab.id = 'amrit-weather-fab';
+    weatherFab.style.cssText = 'position:fixed; bottom: 100px; right: 104px; z-index: 9999; animation: slideIn 0.3s ease-out; animation-delay: 0.1s; animation-fill-mode: both;';
+    weatherFab.innerHTML = '<button title="Check Weather Advisory" style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#0ea5e9,#0369a1);color:white;box-shadow:0 8px 32px rgba(14,165,233,0.4);display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\\'scale(1.05)\\'" onmouseout="this.style.transform=\\'scale(1)\\'" onmousedown="this.style.transform=\\'scale(0.95)\\'">' +
+                           '<span class="material-symbols-outlined" style="font-size:28px;">cloud</span></button>';
+    document.body.appendChild(weatherFab);
+
+    weatherFab.querySelector('button').addEventListener('click', async function() {
+        fabToast('🌤 Fetching latest advisory...', false);
+        this.style.transform = 'scale(0.9)';
+        this.querySelector('.material-symbols-outlined').textContent = 'sync';
+        this.querySelector('.material-symbols-outlined').style.animation = 'spin 1s linear infinite';
+        
+        try {
+            var res = await fetch('/api/n8n/webhook/salt-weather', { method: 'GET' });
+            var data = await res.json();
+            fabToast('🌤 Advisory: ' + (data.farmer_advisory || 'Check your n8n output format!'), false);
+        } catch(e) {
+            console.error('Weather error:', e);
+            fabToast('⚠ Error fetching weather: ' + e.message, true);
+        } finally {
+            this.style.transform = 'scale(1)';
+            this.querySelector('.material-symbols-outlined').textContent = 'cloud';
+            this.querySelector('.material-symbols-outlined').style.animation = 'none';
+        }
+    });
+
+    // ── Chat FAB Button ──
     var fab = document.createElement('div');
     fab.id = 'amrit-global-chat-fab';
     fab.style.cssText = 'position:fixed; bottom: 100px; right: 24px; z-index: 9999; animation: slideIn 0.3s ease-out;';
-    fab.innerHTML = '<button style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#ad350a,#9b2a00);color:white;box-shadow:0 8px 32px rgba(173,53,10,0.4);display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\\'scale(1.05)\\'" onmouseout="this.style.transform=\\'scale(1)\\'" onmousedown="this.style.transform=\\'scale(0.95)\\'">' +
+    fab.innerHTML = '<button title="Ask Amrit AI" style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#ad350a,#9b2a00);color:white;box-shadow:0 8px 32px rgba(173,53,10,0.4);display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\\'scale(1.05)\\'" onmouseout="this.style.transform=\\'scale(1)\\'" onmousedown="this.style.transform=\\'scale(0.95)\\'">' +
                     '<span class="material-symbols-outlined" style="font-size:28px;">smart_toy</span></button>';
     document.body.appendChild(fab);
 
