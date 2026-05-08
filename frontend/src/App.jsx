@@ -19,6 +19,22 @@ const PAGES = {
   settings: settingsHtml,
 };
 
+const N8N_BASE_URL = (import.meta.env.VITE_N8N_BASE_URL || '/api/n8n').replace(/\/$/, '');
+
+const AMRIT_CONFIG_SCRIPT = `
+<script>
+(function() {
+  var base = ${JSON.stringify(N8N_BASE_URL)};
+  window.amritN8nUrl = function(path) {
+    if (!path) return base;
+    if (/^https?:\\/\\//i.test(path)) return path;
+    if (path.charAt(0) !== '/') path = '/' + path;
+    return base + path;
+  };
+})();
+</script>
+`;
+
 /**
  * Navigation script injected into every iframe.
  * Intercepts clicks on nav tabs, profile icons, settings icons, and back buttons,
@@ -210,18 +226,27 @@ function buildDataInjectionScript(liveData, page) {
 
   if (page === 'data') {
     updater = `
-      // Update phase
-      document.querySelectorAll('span').forEach(function(el) {
-        var t = (el.textContent || '').trim();
-        if (t.match(/PHASE: PREPARATORY/i)) el.textContent = 'PHASE: ${(brine?.phase ?? 'Preparatory').toUpperCase()}';
-        if (t === '84.2%') el.textContent = '${brine?.humidity ?? 84.2}%';
+      // Update phase safely leaving the pulse dot intact
+      document.querySelectorAll('div').forEach(function(el) {
+        if (el.textContent.match(/Phase: Preparatory/i)) {
+           for (var i=0; i<el.childNodes.length; i++) {
+               if (el.childNodes[i].nodeType === 3 && el.childNodes[i].nodeValue.match(/Phase: Preparatory/i)) {
+                   el.childNodes[i].nodeValue = ' Phase: ${(brine?.phase ?? "Preparatory")}';
+               }
+           }
+        }
       });
 
-      // Update soil salinity
+      // Update humidity
+      document.querySelectorAll('span').forEach(function(el) {
+        if (el.textContent.trim() === '84.2%') el.textContent = '${brine?.humidity ?? 84.2}%';
+      });
+
+      // Update soil salinity and water PH
       document.querySelectorAll('span, p, text').forEach(function(el) {
         var t = (el.textContent || '').trim();
         if (t === '6.2') el.textContent = '${brine?.soil_salinity ?? 6.2}';
-        if (t === 'STABLE') el.textContent = '${brine?.salinity_status ?? 'STABLE'}';
+        if (t.toUpperCase() === 'STABLE') el.textContent = '${(brine?.salinity_status || "Stable").toUpperCase()}';
         if (t === '7.8') el.textContent = '${brine?.soil_salinity ? (brine.soil_salinity + 1.6).toFixed(1) : 7.8}'; // Water PH Level
       });
 
@@ -236,11 +261,9 @@ function buildDataInjectionScript(liveData, page) {
       // Update Tide Flats / Location
       document.querySelectorAll('p').forEach(function(el) {
         if (el.textContent.trim() === 'Sector 4: Tide Flats') {
-            el.textContent = 'Sector 4: ${weather?.node_id ?? 'Tide Flats'}';
+            el.textContent = 'Sector 4: ${weather?.node_id ?? "Tide Flats"}';
         }
       });
-
-
     `;
   }
 
@@ -634,7 +657,7 @@ const VISION_SCAN_SCRIPT = `
         }
 
         // POST to n8n
-        var response = await fetch('/api/n8n/webhook/vision-frame', {
+        var response = await fetch(window.amritN8nUrl('/webhook/vision-frame'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image: base64String })
@@ -803,7 +826,7 @@ const VISION_SCAN_SCRIPT = `
             ctx.drawImage(srcEl, 0, 0, canvas.width, canvas.height);
             var base64Str = canvas.toDataURL('image/jpeg', 0.5);
 
-            var endpoint = '/api/n8n/webhook/vision-frame';
+            var endpoint = window.amritN8nUrl('/webhook/vision-frame');
             var response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -878,7 +901,7 @@ const CHATBOT_SCRIPT = `
     ].join('\\n');
     document.head.appendChild(vs);
 
-    var webhookUrl = '/api/n8n/webhook/voice-agent';
+    var webhookUrl = window.amritN8nUrl('/webhook/free-voice-agent');
     
     var banner = document.createElement('div');
     banner.id = 'amrit-webhook-status';
@@ -893,7 +916,7 @@ const CHATBOT_SCRIPT = `
     async function checkWebhookHealth() {
       try {
         var res = await fetch(webhookUrl, { method: 'GET' });
-        if (res.status === 405 || res.ok) {
+        if (res.status === 405 || res.status === 404 || res.ok) {
           isWorkflowActive = true;
           banner.style.display = 'flex';
           if (retryInterval) { clearInterval(retryInterval); retryInterval = null; }
@@ -1012,7 +1035,7 @@ const CHATBOT_SCRIPT = `
               var raw = await r.text();
               console.log('[Amrit Voice] Received text response:', raw);
               var data; try { data = JSON.parse(raw); } catch(e) { data = raw; }
-              var reply = typeof data === 'string' ? data : ((data.content && data.content.parts && data.content.parts[0] && data.content.parts[0].text) || data.output || data.response || data.message || data.text || JSON.stringify(data));
+              var reply = typeof data === 'string' ? data : ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || (data.content && data.content.parts && data.content.parts[0] && data.content.parts[0].text) || data.output || data.response || data.message || data.text || JSON.stringify(data));
               appendMessage(reply, false);
               
               if ('speechSynthesis' in window) {
@@ -1098,7 +1121,7 @@ const CHATBOT_SCRIPT = `
         var controller = new AbortController();
         var timeout = setTimeout(function(){ controller.abort(); }, 60000);
 
-        var webhookPath = '/api/n8n/webhook/chat';
+        var webhookPath = window.amritN8nUrl('/webhook/chat');
         var fetchOpts = {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1227,7 +1250,7 @@ const DASHBOARD_MIC_SCRIPT = `
 
     if (!micBtn) return;
 
-    var webhookUrl = '/api/n8n/webhook/voice-agent';
+    var webhookUrl = window.amritN8nUrl('/webhook/free-voice-agent');
     var isRecording = false;
     var mediaRecorder = null;
     var audioChunks = [];
@@ -1262,14 +1285,24 @@ const DASHBOARD_MIC_SCRIPT = `
         on ? waveDiv.classList.add('amrit-dash-wave-active') : waveDiv.classList.remove('amrit-dash-wave-active');
       }
       if (listeningLabel) listeningLabel.textContent = on ? 'RECORDING...' : 'LISTENING...';
-      if (tapLabel) tapLabel.textContent = on ? 'Tap again to stop and send' : 'Tap to speak in Konkani or Marathi.';
+      if (tapLabel) tapLabel.textContent = on ? 'Tap again to stop and send' : 'Tap to speak to Amrit.';
+    }
+
+    function forceSpeakText(text) {
+        if ('speechSynthesis' in window) {
+           var utterance = new SpeechSynthesisUtterance(text.replace(/[*#]/g, ''));
+           var voices = window.speechSynthesis.getVoices();
+           var indVoice = voices.find(function(v) { return v.lang.includes('kok') || v.lang.includes('mr') || v.lang.includes('hi'); });
+           if (indVoice) utterance.voice = indVoice;
+           window.speechSynthesis.speak(utterance);
+        }
     }
 
     async function startRec() {
       try {
         var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         audioChunks = [];
-        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+        mediaRecorder = new MediaRecorder(stream);
         mediaRecorder.ondataavailable = function(e) { if (e.data.size > 0) audioChunks.push(e.data); };
         mediaRecorder.onstop = async function() {
           stream.getTracks().forEach(function(t){ t.stop(); });
@@ -1277,47 +1310,52 @@ const DASHBOARD_MIC_SCRIPT = `
           setRecordingUI(false);
           if (listeningLabel) listeningLabel.textContent = 'SENDING...';
           if (tapLabel) tapLabel.textContent = 'Processing your voice...';
-          showToast('🎤 Sending voice to Amrit AI...', false);
+          showToast('🎤 Sending voice to Amrit...', false);
           
           try {
             var controller = new AbortController();
             var tmout = setTimeout(function(){ controller.abort(); }, 120000);
             
             var formData = new FormData();
-            formData.append('audio', blob, 'recording.webm');
+            formData.append('user_audio', blob, 'voice.webm');
             
             var r = await fetch(webhookUrl, { method:'POST', body: formData, signal: controller.signal });
             clearTimeout(tmout);
             
             if (!r.ok) throw new Error('Status ' + r.status);
             
-            var ct = r.headers.get('content-type') || '';
-            if (ct.indexOf('audio') !== -1) {
-              var audioBlob = await r.blob();
-              var url = URL.createObjectURL(audioBlob);
-              var audio = new Audio(url);
-              audio.play();
-              showToast('🔊 Playing response from Amrit AI', false);
+            var resClone = r.clone();
+            var audioBlob = await resClone.blob();
+            
+            if (audioBlob.size > 500 && (audioBlob.type.indexOf('audio') !== -1 || audioBlob.type.indexOf('mpeg') !== -1 || audioBlob.type === 'application/octet-stream' || audioBlob.type === '')) {
+                var url = window.URL.createObjectURL(audioBlob);
+                var audio = new Audio(url);
+                // Append it to DOM to prevent Garbage Collection and ensure playability
+                audio.style.display = 'none';
+                document.body.appendChild(audio);
+                
+                audio.play().then(function() {
+                    showToast('🔊 Amrit is speaking...', false);
+                }).catch(function(e) {
+                    console.error("Audio block:", e);
+                    showToast('🔊 Click the page to allow Amrit to speak!', true);
+                });
+                
+                // Cleanup after audio ends
+                audio.onended = function() { audio.remove(); window.URL.revokeObjectURL(url); };
             } else {
-              var raw = await r.text();
-              var data; try{data=JSON.parse(raw);}catch(e){data=raw;}
-              var reply = typeof data==='string' ? data : ((data.content && data.content.parts && data.content.parts[0] && data.content.parts[0].text) || data.output || data.response || data.message || data.text || JSON.stringify(data));
-              showToast('💬 ' + reply.substring(0,100), false);
-              
-              if ('speechSynthesis' in window) {
-                var utterance = new SpeechSynthesisUtterance(reply.replace(/[*#]/g, ''));
-                var voices = window.speechSynthesis.getVoices();
-                var indVoice = voices.find(v => v.lang.includes('kok') || v.lang.includes('mr-IN') || v.lang.includes('hi-IN') || v.lang.includes('en-IN'));
-                if (indVoice) utterance.voice = indVoice;
-                window.speechSynthesis.speak(utterance);
-              }
+                var raw = await r.text();
+                var data; try{data=JSON.parse(raw);}catch(e){data=raw;}
+                var reply = typeof data==='string' ? data : ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || data.output || data.response || data.text || JSON.stringify(data));
+                showToast('💬 ' + reply.substring(0,100), false);
+                forceSpeakText(reply);
             }
           } catch(e) {
             var emsg = e.name === 'AbortError' ? 'Timed out (120s)' : e.message;
             showToast('⚠ Voice agent error: ' + emsg, true);
           }
           if (listeningLabel) listeningLabel.textContent = 'LISTENING...';
-          if (tapLabel) tapLabel.textContent = 'Tap to speak in Konkani or Marathi.';
+          if (tapLabel) tapLabel.textContent = 'Tap to speak to Amrit.';
         };
         mediaRecorder.start();
         isRecording = true;
@@ -1402,19 +1440,27 @@ const FAB_SCRIPT = `
       var toast = document.createElement('div');
       toast.id = 'amrit-fab-toast';
       toast.style.cssText = 'position:fixed;top:80px;right:16px;z-index:9999;' +
-        'max-width:380px;padding:16px 20px;border-radius:12px;font-family:Space Grotesk,sans-serif;' +
-        'font-size:13px;color:#fff;box-shadow:0 8px 32px rgba(0,0,0,0.25);' +
+        'max-width:380px;padding:16px 20px 16px 24px;border-radius:12px;font-family:Space Grotesk,sans-serif;' +
+        'font-size:13px;line-height:1.4;color:#fff;box-shadow:0 8px 32px rgba(0,0,0,0.25);' +
         'backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);' +
         'animation:slideIn 0.3s ease-out;word-break:break-word;' +
+        'display:flex;align-items:flex-start;gap:12px;' +
         'background:' + (isError ? 'rgba(172,49,73,0.95)' : 'rgba(14,165,233,0.95)') + ';';
-      toast.textContent = message;
+      
+      toast.innerHTML = '<div style="flex:1;">' + message + '</div>' + 
+                        '<button id="amrit-fab-toast-close" title="Close" style="background:none;border:none;color:#fff;cursor:pointer;font-size:16px;font-weight:bold;opacity:0.7;padding:0;line-height:1;margin-top:-2px;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.7">✕</button>';
+      
       document.body.appendChild(toast);
-      setTimeout(function() {
-        toast.style.transition = 'opacity 0.5s, transform 0.5s';
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateX(100%)';
-        setTimeout(function() { toast.remove(); }, 500);
-      }, 10000); // 10s to read weather
+      
+      var closeBtn = document.getElementById('amrit-fab-toast-close');
+      if (closeBtn) {
+        closeBtn.onclick = function() {
+          toast.style.transition = 'opacity 0.3s, transform 0.3s';
+          toast.style.opacity = '0';
+          toast.style.transform = 'translateY(-20px)';
+          setTimeout(function() { toast.remove(); }, 300);
+        };
+      }
     }
 
     var weatherFab = document.createElement('div');
@@ -1431,10 +1477,10 @@ const FAB_SCRIPT = `
         this.querySelector('.material-symbols-outlined').style.animation = 'spin 1s linear infinite';
         
         try {
-            var res = await fetch('/api/n8n/webhook/salt-weather', { method: 'GET' });
+            var res = await fetch(window.amritN8nUrl('/webhook/salt-weather'), { method: 'GET' });
             if (!res.ok) {
                 if (res.status === 404) {
-                    res = await fetch('/api/n8n/webhook-test/salt-weather', { method: 'GET' });
+                    res = await fetch(window.amritN8nUrl('/webhook-test/salt-weather'), { method: 'GET' });
                 }
                 if (!res.ok) throw new Error('API Error ' + res.status);
             }
@@ -1507,7 +1553,7 @@ const FAB_SCRIPT = `
         var controller = new AbortController();
         var timeout = setTimeout(function(){ controller.abort(); }, 60000);
 
-        var res = await fetch('/api/n8n/webhook/chat', {
+        var res = await fetch(window.amritN8nUrl('/webhook/chat'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: txt }),
@@ -1581,13 +1627,15 @@ const FAB_SCRIPT = `
 </script>
 `;
 
+const VOICE_FAB_SCRIPT = ``;
+
 function injectScripts(html, liveData, page) {
   const dataScript = buildDataInjectionScript(liveData, page);
   const scanScript = (page === 'dashboard' || page === 'vision') ? VISION_SCAN_SCRIPT : '';
   const chatScript = page === 'voice' ? CHATBOT_SCRIPT : '';
   const dashMicScript = page === 'dashboard' ? DASHBOARD_MIC_SCRIPT : '';
   const fabScript = page !== 'voice' ? FAB_SCRIPT : '';
-  return html.replace('</body>', NAV_INJECTION_SCRIPT + dataScript + scanScript + chatScript + dashMicScript + fabScript + '</body>');
+  return html.replace('</body>', AMRIT_CONFIG_SCRIPT + NAV_INJECTION_SCRIPT + dataScript + scanScript + chatScript + dashMicScript + fabScript + '</body>');
 }
 
 function App() {

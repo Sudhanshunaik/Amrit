@@ -9,3 +9,15 @@ node_modules/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Deployment artifacts and local n8n credential exports
+deploy/*.zip
+deploy/**/.env
+!deploy/**/.env.example
+!deploy/**/.env.sslip.example
+deploy/hostinger-vps/site/
+deploy/hostinger-vps/local-files/
+deploy/n8n-workflows/
+deploy/n8n-credentials-encrypted/
+deploy/hostinger-vps/n8n-import/workflows/
+deploy/hostinger-vps/n8n-import/credentials/

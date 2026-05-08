@@ -1,0 +1,23 @@
+{
+	email {$SSL_EMAIL}
+}
+
+{$APP_HOST} {
+	encode zstd gzip
+
+	handle /api/n8n/* {
+		uri strip_prefix /api/n8n
+		reverse_proxy n8n:5678
+	}
+
+	handle {
+		root * /srv/amrit
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+{$N8N_HOST} {
+	encode zstd gzip
+	reverse_proxy n8n:5678
+}
