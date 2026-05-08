@@ -9,6 +9,8 @@ For friends to access it anytime, both parts need to run on a server. The prepar
 
 `deploy/hostinger-vps/`
 
+The live VPS has already been loaded with the local n8n workflow and credential exports. Those export files are intentionally ignored in Git because n8n workflow JSON can contain inline API keys or other sensitive values.
+
 ## No Domain Setup
 
 Use a Hostinger VPS IP with `sslip.io`:
@@ -55,4 +57,3 @@ Finally, activate the workflows used by the app:
 - `free-voice-agent`
 - `chat`
 - `salt-weather`
-

@@ -10,8 +10,10 @@ This bundle is for a Hostinger VPS with Docker. Use two DNS records pointed at t
 - `compose.yaml` runs Caddy and n8n.
 - `Caddyfile` serves the React build and proxies `/api/n8n/*` to n8n.
 - `site/` contains the built dashboard files.
-- `n8n-import/workflows/` contains exported n8n workflow JSON.
-- `n8n-import/credentials/` contains encrypted credential exports.
+- `n8n-import/workflows/` contains exported n8n workflow JSON in the local deployment bundle only.
+- `n8n-import/credentials/` contains encrypted credential exports in the local deployment bundle only.
+
+The n8n export folders are ignored in Git because workflow JSON can contain inline API keys.
 
 ## Server Steps
 
@@ -34,4 +36,3 @@ sh import-n8n.sh
 ## App Webhook Routing
 
 The built frontend calls `/api/n8n/webhook/...`. Caddy strips `/api/n8n` and forwards requests to the n8n container, so browser calls become production n8n webhook calls without exposing port `5678`.
-
