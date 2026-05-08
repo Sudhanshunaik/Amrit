@@ -458,7 +458,7 @@ const VISION_SCAN_SCRIPT = `
     liveBtn.style.cssText = getBtnStyle('linear-gradient(135deg,#0ea5e9,#0369a1)');
     liveBtn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:4px;">' +
       '<span class="material-symbols-outlined" style="font-size:16px;" data-icon="videocam">videocam</span>' +
-      'LIVE FEED</span>';
+      'DEVICE CAMERA</span>';
     buttonGroup.appendChild(liveBtn);
 
     // ── 8. Anomaly toggle ──
@@ -706,12 +706,70 @@ const VISION_SCAN_SCRIPT = `
     var liveInterval = null;
     var originalLiveHTML = liveBtn.innerHTML;
     var streamRef = null;
+    var preferredCameraId = '';
+
+    function buildCameraConstraints(deviceId) {
+      if (deviceId) {
+        return {
+          audio: false,
+          video: {
+            deviceId: { exact: deviceId },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        };
+      }
+
+      return {
+        audio: false,
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      };
+    }
+
+    async function requestDeviceCamera(deviceId) {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Device camera is not available in this browser.');
+      }
+
+      try {
+        return await navigator.mediaDevices.getUserMedia(buildCameraConstraints(deviceId));
+      } catch (err) {
+        if (!deviceId) {
+          console.warn('[Amrit] Rear camera request failed, falling back to any camera:', err);
+          return await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+        }
+        throw err;
+      }
+    }
+
+    async function attachCameraStream(stream) {
+      streamRef = stream;
+
+      if (videoEl) {
+          videoEl.srcObject = stream;
+          videoEl.removeAttribute('src');
+          videoEl.setAttribute('playsinline', '');
+          videoEl.setAttribute('autoplay', '');
+          videoEl.muted = true;
+          videoEl.style.zIndex = '50';
+          videoEl.style.background = '#000';
+          videoEl.style.border = 'none';
+          videoEl.style.borderRadius = '24px';
+          videoEl.style.opacity = '1';
+          await videoEl.play().catch(function(e){ console.error('Play err', e); });
+      }
+
+      if (feedImg) feedImg.style.opacity = '0';
+    }
 
     liveBtn.addEventListener('click', async function(e) {
       e.preventDefault(); e.stopPropagation();
       
       if (isLiveActive) {
-          // Stop live
           isLiveActive = false;
           window.amritIsLiveActive = false;
           clearInterval(liveInterval);
@@ -720,62 +778,37 @@ const VISION_SCAN_SCRIPT = `
           liveBtn.style.cssText = getBtnStyle('linear-gradient(135deg,#0ea5e9,#0369a1)');
           if (videoEl) { videoEl.pause(); videoEl.srcObject = null; videoEl.removeAttribute('src'); videoEl.style.opacity = '0'; }
           if (feedImg) feedImg.style.opacity = '0.8';
-          showToast('⏸ Live Monitoring Stopped.', false);
+          showToast('Live device camera stopped.', false);
           return;
       }
 
-      // Start live via Webcam
       try {
-          resetToNormal(); // Clear any existing UI anomalies BEFORE trying to start the feed
+          resetToNormal();
           
-          var constraints = { video: true };
-          
-          // Use whatever device is selected in the dropdown if available
           var camSelect = document.getElementById('amrit-cam-select');
-          if (camSelect && camSelect.value) {
-              constraints.video = { deviceId: { exact: camSelect.value } };
-          }
+          var selectedCameraId = camSelect && camSelect.value ? camSelect.value : preferredCameraId;
+          var stream = await requestDeviceCamera(selectedCameraId);
+          await attachCameraStream(stream);
           
-          var stream = await navigator.mediaDevices.getUserMedia(constraints);
-          streamRef = stream;
-
-          if (videoEl) {
-              videoEl.srcObject = stream;
-              videoEl.removeAttribute('src');
-              videoEl.style.zIndex = '50';
-              videoEl.style.background = '#000';
-              videoEl.style.border = 'none'; // removing the green debug border
-              videoEl.style.borderRadius = '24px'; // match the original image borders
-              videoEl.play().catch(e=>console.error('Play err',e));
-              videoEl.style.opacity = '1';
-          }
-          if (feedImg) feedImg.style.opacity = '0';
-          
-          // Populate the camera selector so they can switch
-          var devices = await navigator.mediaDevices.enumerateDevices();
+          var devices = navigator.mediaDevices.enumerateDevices ? await navigator.mediaDevices.enumerateDevices() : [];
           var videoDevices = devices.filter(function(d) { return d.kind === 'videoinput' });
           if (!camSelect) {
               camSelect = document.createElement('select');
               camSelect.id = 'amrit-cam-select';
-              camSelect.style.cssText = 'padding:0 8px; border-radius:12px; border:1px solid #ddd; background:#f9fafb; font-family:Inter; font-size:12px; color:#475569; max-width: 150px;';
-              // Insert it right before the Live Feed button
+              camSelect.title = 'Choose camera';
+              camSelect.style.cssText = 'padding:0 8px; border-radius:12px; border:1px solid #ddd; background:#f9fafb; font-family:Space Grotesk, sans-serif; font-size:12px; color:#475569; max-width: 170px; min-height:34px;';
               liveBtn.parentNode.insertBefore(camSelect, liveBtn);
               
               camSelect.onchange = async function() {
-                  console.log('[Amrit] 🔄 Switching camera to:', camSelect.value);
+                  console.log('[Amrit] Switching device camera to:', camSelect.value);
+                  preferredCameraId = camSelect.value;
                   if (streamRef) streamRef.getTracks().forEach(function(t) { t.stop() });
                   try {
-                      var newStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: camSelect.value } } });
-                      streamRef = newStream;
-                      if (videoEl) {
-                          videoEl.removeAttribute('src');
-                          videoEl.srcObject = newStream;
-                          videoEl.style.opacity = '1';
-                          videoEl.play().catch(function(e){ console.error('Play err', e) });
-                      }
+                      var newStream = await requestDeviceCamera(camSelect.value);
+                      await attachCameraStream(newStream);
                   } catch (e) {
                       console.error('[Amrit] Camera switch error:', e);
-                      // Avoid showing a toast if they just clicked the dropdown while it was loading, etc.
+                      showToast('Camera switch failed: ' + (e.message || 'Please try another camera.'), true);
                   }
               };
           }
@@ -784,11 +817,17 @@ const VISION_SCAN_SCRIPT = `
           videoDevices.forEach(function(d) {
               var opt = document.createElement('option');
               opt.value = d.deviceId;
-              opt.text = d.label || 'Camera ' + (camSelect.length + 1);
-              if (streamRef.getVideoTracks()[0] && d.label === streamRef.getVideoTracks()[0].label) opt.selected = true;
+              var label = d.label || 'Camera ' + (camSelect.length + 1);
+              opt.text = label;
+              if (!preferredCameraId && label.toLowerCase().indexOf('back') !== -1) preferredCameraId = d.deviceId;
+              if (!preferredCameraId && label.toLowerCase().indexOf('rear') !== -1) preferredCameraId = d.deviceId;
+              if (streamRef.getVideoTracks()[0] && label === streamRef.getVideoTracks()[0].label) {
+                opt.selected = true;
+                preferredCameraId = d.deviceId;
+              }
               camSelect.appendChild(opt);
           });
-          camSelect.style.display = 'inline-block';
+          camSelect.style.display = videoDevices.length > 1 ? 'inline-block' : 'none';
           if (feedImg) feedImg.style.opacity = '0';
           
           isLiveActive = true;
@@ -796,12 +835,13 @@ const VISION_SCAN_SCRIPT = `
           isAnomalyActive = false;
           liveBtn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:6px;">' +
             '<span class="amrit-anomaly-dot" style="background:#fff;"></span>' +
-            'MONITORING...</span>';
+            'CAMERA ACTIVE</span>';
           liveBtn.style.cssText = getBtnStyle('linear-gradient(135deg,#c2410c,#9a3412)');
-          showToast('🟢 Live feed active. AI analyzing environment...', false);
+          showToast('Device camera active. AI is analyzing live frames.', false);
 
       } catch(err) {
-          showToast('⚠ Camera access denied: Please allow permissions or run on localhost/https.', true);
+          console.error('[Amrit] Device camera error:', err);
+          showToast('Camera access failed: allow camera permission and reopen Device Camera.', true);
       }
     });
 
